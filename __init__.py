@@ -16,7 +16,7 @@ from datetime import datetime
 import daemon
 import pypb.memusage as mu
 
-LOGDIR = "/var/tmp/{}/logs".format(os.environ["LOGNAME"])
+LOGDIR = "/var/tmp/{}/pypb/logs/".format(os.environ["LOGNAME"])
 LOGTIMEFMT = "%Y-%m-%d_%H:%M:%S."
 
 # Define logger

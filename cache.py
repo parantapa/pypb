@@ -14,7 +14,7 @@ from datetime import datetime
 from functools import wraps
 
 # Cache directory to store results
-CACHEDIR = "/var/tmp/{}/{}/".format(os.environ["LOGNAME"], __name__)
+CACHEDIR = "/var/tmp/{}/pypb/cache/".format(os.environ["LOGNAME"])
 
 from logbook import Logger
 log = Logger(__name__)
