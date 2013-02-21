@@ -7,18 +7,40 @@ MW4S - Muliple Worker, Single Source, Single Sink
 __author__  = "Parantapa Bhattacharya <pb@parantapa.net>"
 
 import time
-
 import zmq
 
-# Sync time before closing
+# Buffer time letting the sink request socket at source to close
 CLOSESYNC = 15
 
 class Error(ValueError):
     """
-    M4WS protocol error
+    Protocol error.
     """
 
-    pass
+class Message(object):
+    """
+    Protocol message.
+    """
+
+class WorkerJoinMessage(Message):
+    """
+    Worker join message.
+    """
+
+class WorkerExitedMessage(Message):
+    """
+    Worker exited message.
+    """
+
+class NoMoreJobsMessage(Message):
+    """
+    No more jobs message.
+    """
+
+class SourceExitedMessage(Message):
+    """
+    Source exited message.
+    """
 
 def rep_socket(addr):
     """
@@ -70,13 +92,17 @@ class Source(object):
 
         while True:
             req = self.ssock.recv_pyobj()
+
             if req is None:
                 self.ssock.send_pyobj(task)
                 return
-
-            if isinstance(req, bool):
+            if isinstance(req, WorkerJoinMessage):
                 self.ssock.send_pyobj(None)
-                self.nworkers += (1 if req else -1)
+                self.nworkers += 1
+                continue
+            if isinstance(req, WorkerExitedMessage):
+                self.ssock.send_pyobj(None)
+                self.nworkers -= 1
                 continue
 
             raise Error("Invalid request {!r}".format(req))
@@ -88,44 +114,43 @@ class Source(object):
 
         while self.nworkers > 0:
             req = self.ssock.recv_pyobj()
-            if req is None:
-                self.ssock.send_pyobj(StopIteration())
-                continue
 
-            if isinstance(req, bool):
+            if req is None:
+                self.ssock.send_pyobj(NoMoreJobsMessage())
+                continue
+            if isinstance(req, WorkerJoinMessage):
                 self.ssock.send_pyobj(None)
-                self.nworkers += (1 if req else -1)
+                self.nworkers += 1
+                continue
+            if isinstance(req, WorkerExitedMessage):
+                self.ssock.send_pyobj(None)
+                self.nworkers -= 1
                 continue
 
             raise Error("Invalid request {!r}".format(req))
 
-        self.tsock.send_pyobj(StopIteration())
+        # Inform sink that source has exited
+        self.tsock.send_pyobj(SourceExitedMessage())
         rep = self.tsock.recv_pyobj()
         if rep is not None:
             raise Error("Invalid response {!r}".format(rep))
 
-        # FIXME: Time the closing between source and sink.
-        # This hack is to make sure the race condition, when the bound socket
-        # is closed before the connecting socket doesn't happen. Otherwise
-        # ZeroMQ goes into a loop trying to reconnect to the remote side.
-        # Currently I don't know a better way to fix this.
+        # Close the sockets
         self.tsock.close()
-        time.sleep(CLOSESYNC)
         self.ssock.close()
 
 class Sink(object):
     """
-    Sink(saddr, taddr) -- job sink socket
+    Sink(taddr) -- job sink socket
 
-    saddr - source address
     taddr - sink address
     """
 
-    def __init__(self, saddr, taddr):
-        self.saddr = saddr
+    def __init__(self, taddr):
         self.taddr = taddr
-        self.ssock = req_socket(saddr)
         self.tsock = rep_socket(taddr)
+        self.nworkers = 0
+        self.source_closed = False
 
     def __iter__(self):
         return self
@@ -141,22 +166,31 @@ class Sink(object):
         Return next result from worker.
         """
 
-        result = self.tsock.recv_pyobj()
-        self.tsock.send_pyobj(None)
+        while not self.source_closed or self.nworkers > 0:
+            result = self.tsock.recv_pyobj()
+            self.tsock.send_pyobj(None)
 
-        if isinstance(result, StopIteration):
-            raise result
+            if isinstance(result, WorkerJoinMessage):
+                self.nworkers += 1
+                continue
+            if isinstance(result, WorkerExitedMessage):
+                self.nworkers -= 1
+                continue
+            if isinstance(result, SourceExitedMessage):
+                self.source_closed = True
+                continue
 
-        return result
+            return result
+
+        raise StopIteration()
 
     def close(self):
         """
         Close the sockets.
         """
 
-        # FIXME: Time the closing between source and sink.
-        # See the note for SourceSocket.close.
-        self.ssock.close()
+        # FIXME: Give the request sockets some time to close, othewise they
+        # go into a infinite loop trying to reconnect.
         time.sleep(CLOSESYNC)
         self.tsock.close()
 
@@ -174,8 +208,15 @@ class Worker(object):
         self.ssock = req_socket(saddr)
         self.tsock = req_socket(taddr)
 
-        self.ssock.send_pyobj(True)
+        # Send join message to source
+        self.ssock.send_pyobj(WorkerJoinMessage())
         rep = self.ssock.recv_pyobj()
+        if rep is not None:
+            raise Error("Invalid response {!r}".format(rep))
+
+        # Sent join message to sink
+        self.tsock.send_pyobj(WorkerJoinMessage())
+        rep = self.tsock.recv_pyobj()
         if rep is not None:
             raise Error("Invalid response {!r}".format(rep))
 
@@ -196,8 +237,8 @@ class Worker(object):
         self.ssock.send_pyobj(None)
         task = self.ssock.recv_pyobj()
 
-        if isinstance(task, StopIteration):
-            raise task
+        if isinstance(task, NoMoreJobsMessage):
+            raise StopIteration()
 
         return task
 
@@ -216,8 +257,15 @@ class Worker(object):
         Inform source of leaving.
         """
 
-        self.ssock.send_pyobj(False)
+        # Send exit message to source
+        self.ssock.send_pyobj(WorkerExitedMessage())
         rep = self.ssock.recv_pyobj()
+        if rep is not None:
+            raise Error("Invalid response {!r}".format(rep))
+
+        # Send exit message to sink
+        self.tsock.send_pyobj(WorkerExitedMessage())
+        rep = self.tsock.recv_pyobj()
         if rep is not None:
             raise Error("Invalid response {!r}".format(rep))
 
