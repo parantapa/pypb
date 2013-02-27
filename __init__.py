@@ -15,6 +15,7 @@ from datetime import datetime
 
 import daemon
 import pypb.memusage as mu
+from functools import wraps
 
 LOGDIR = "/var/tmp/{}/pypb/logs/".format(os.environ["LOGNAME"])
 LOGTIMEFMT = "%Y-%m-%d_%H:%M:%S."
@@ -25,6 +26,23 @@ log = Logger(__name__)
 
 # Note start time
 start = datetime.utcnow()
+
+def coroutine(origfn):
+    """
+    Generator to prime coroutines.
+    """
+
+    @wraps(origfn)
+    def wrapfn(*args, **kwargs):
+        """
+        Prime the coroutine by calling next.
+        """
+
+        cr = origfn(*args, **kwargs)
+        cr.next()
+        return cr
+
+    return wrapfn
 
 def exit_signal(signum, _):
     """
