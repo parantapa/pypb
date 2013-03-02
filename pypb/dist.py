@@ -73,11 +73,15 @@ class Source(object):
     """
 
     def __init__(self, saddr, taddr):
-        self.saddr = saddr
-        self.taddr = taddr
-        self.ssock = rep_socket(saddr)
-        self.tsock = req_socket(taddr)
+        self.saddr    = saddr
+        self.taddr    = taddr
+        self.ssock    = rep_socket(saddr)
+        self.tsock    = req_socket(taddr)
         self.nworkers = 0
+        self.closed   = False
+
+    def __del__(self):
+        self.close()
 
     def __enter__(self):
         return self
@@ -111,6 +115,10 @@ class Source(object):
         """
         Wait for all workers to finish and send close signal to sink.
         """
+
+        if self.closed:
+            return
+        self.closed = True
 
         while self.nworkers > 0:
             req = self.ssock.recv_pyobj()
@@ -147,10 +155,14 @@ class Sink(object):
     """
 
     def __init__(self, taddr):
-        self.taddr = taddr
-        self.tsock = rep_socket(taddr)
-        self.nworkers = 0
+        self.taddr         = taddr
+        self.tsock         = rep_socket(taddr)
+        self.nworkers      = 0
         self.source_closed = False
+        self.closed        = False
+
+    def __del__(self):
+        self.close()
 
     def __iter__(self):
         return self
@@ -189,6 +201,10 @@ class Sink(object):
         Close the sockets.
         """
 
+        if self.closed:
+            return
+        self.closed = True
+
         # FIXME: Give the request sockets some time to close, othewise they
         # go into a infinite loop trying to reconnect.
         time.sleep(CLOSESYNC)
@@ -203,10 +219,11 @@ class Worker(object):
     """
 
     def __init__(self, saddr, taddr):
-        self.saddr = saddr
-        self.taddr = taddr
-        self.ssock = req_socket(saddr)
-        self.tsock = req_socket(taddr)
+        self.saddr  = saddr
+        self.taddr  = taddr
+        self.ssock  = req_socket(saddr)
+        self.tsock  = req_socket(taddr)
+        self.closed = False
 
         # Send join message to source
         self.ssock.send_pyobj(WorkerJoinMessage())
@@ -219,6 +236,9 @@ class Worker(object):
         rep = self.tsock.recv_pyobj()
         if rep is not None:
             raise Error("Invalid response {!r}".format(rep))
+
+    def __del__(self):
+        self.close()
 
     def __iter__(self):
         return self
@@ -256,6 +276,10 @@ class Worker(object):
         """
         Inform source of leaving.
         """
+
+        if self.closed:
+            return
+        self.closed = True
 
         # Send exit message to source
         self.ssock.send_pyobj(WorkerExitedMessage())
