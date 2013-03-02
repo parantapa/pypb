@@ -17,3 +17,8 @@ All modules depend on Logbook. Other dependecies are given here.
 * pypb.iter_recipes - None
 * pypb.unescape     - None
 
+Disclaimer
+----------
+
+This package contains code written by me and code copy pasted from all over the
+internet.
