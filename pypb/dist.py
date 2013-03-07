@@ -9,6 +9,8 @@ __author__  = "Parantapa Bhattacharya <pb@parantapa.net>"
 import time
 import zmq
 
+import pypb.abs
+
 # Buffer time letting the sink request socket at source to close
 CLOSESYNC = 15
 
@@ -64,7 +66,7 @@ def req_socket(addr):
 
     return sock
 
-class Source(object):
+class Source(pypb.abs.Close):
     """
     Source(saddr, taddr) - job source socket
 
@@ -78,16 +80,6 @@ class Source(object):
         self.ssock    = rep_socket(saddr)
         self.tsock    = req_socket(taddr)
         self.nworkers = 0
-        self.closed   = False
-
-    def __del__(self):
-        self.close()
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, exc_type, exc_value, traceback):
-        self.close()
 
     def send(self, task):
         """
@@ -111,14 +103,11 @@ class Source(object):
 
             raise Error("Invalid request {!r}".format(req))
 
+    @pypb.abs.runonce
     def close(self):
         """
         Wait for all workers to finish and send close signal to sink.
         """
-
-        if self.closed:
-            return
-        self.closed = True
 
         while self.nworkers > 0:
             req = self.ssock.recv_pyobj()
@@ -147,7 +136,7 @@ class Source(object):
         self.tsock.close()
         self.ssock.close()
 
-class Sink(object):
+class Sink(pypb.abs.Close):
     """
     Sink(taddr) -- job sink socket
 
@@ -159,19 +148,9 @@ class Sink(object):
         self.tsock         = rep_socket(taddr)
         self.nworkers      = 0
         self.source_closed = False
-        self.closed        = False
-
-    def __del__(self):
-        self.close()
 
     def __iter__(self):
         return self
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, exc_type, exc_value, traceback):
-        self.close()
 
     def next(self):
         """
@@ -196,21 +175,18 @@ class Sink(object):
 
         raise StopIteration()
 
+    @pypb.abs.runonce
     def close(self):
         """
         Close the sockets.
         """
-
-        if self.closed:
-            return
-        self.closed = True
 
         # FIXME: Give the request sockets some time to close, othewise they
         # go into a infinite loop trying to reconnect.
         time.sleep(CLOSESYNC)
         self.tsock.close()
 
-class Worker(object):
+class Worker(pypb.abs.Close):
     """
     Worker(saddr, taddr) -- job worker socket
 
@@ -223,7 +199,6 @@ class Worker(object):
         self.taddr  = taddr
         self.ssock  = req_socket(saddr)
         self.tsock  = req_socket(taddr)
-        self.closed = False
 
         # Send join message to source
         self.ssock.send_pyobj(WorkerJoinMessage())
@@ -237,17 +212,8 @@ class Worker(object):
         if rep is not None:
             raise Error("Invalid response {!r}".format(rep))
 
-    def __del__(self):
-        self.close()
-
     def __iter__(self):
         return self
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, exc_type, exc_value, traceback):
-        self.close()
 
     def next(self):
         """
@@ -272,14 +238,11 @@ class Worker(object):
         if rep is not None:
             raise Error("Invalid response {!r}".format(rep))
 
+    @pypb.abs.runonce
     def close(self):
         """
         Inform source of leaving.
         """
-
-        if self.closed:
-            return
-        self.closed = True
 
         # Send exit message to source
         self.ssock.send_pyobj(WorkerExitedMessage())
