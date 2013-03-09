@@ -41,6 +41,8 @@ def runonce(origfn):
     Run the original _METHOD_ once only.
     """
 
+    attrname = "_%s_once_result" % id(origfn)
+
     @wraps(origfn)
     def newfn(self, *args, **kwargs):
         """
@@ -48,11 +50,10 @@ def runonce(origfn):
         """
 
         try:
-            if self._closed:
-                return
+            return getattr(self, attrname)
         except AttributeError:
-            self._closed = True
-            return origfn(self, *args, **kwargs)
+            setattr(self, attrname, origfn(self, *args, **kwargs))
+            return getattr(self, attrname)
 
     return newfn
 
