@@ -38,22 +38,21 @@ class Close(object):
 
 def runonce(origfn):
     """
-    Run the original function once only.
+    Run the original _METHOD_ once only.
     """
 
-    flag = []
-
     @wraps(origfn)
-    def newfn(*args, **kwargs):
+    def newfn(self, *args, **kwargs):
         """
-        Replacement function.
+        Replacement _METHOD_.
         """
 
-        if flag:
-            return
-        flag.append(None)
-
-        return origfn(*args, **kwargs)
+        try:
+            if self._closed:
+                return
+        except AttributeError:
+            self._closed = True
+            return origfn(self, *args, **kwargs)
 
     return newfn
 
