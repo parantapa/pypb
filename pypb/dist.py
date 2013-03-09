@@ -68,13 +68,14 @@ def req_socket(addr):
 
 class Source(pypb.abs.Close):
     """
-    Source(saddr, taddr) - job source socket
+    Source(xaddrs) - job source socket
 
-    saddr - source address
-    taddr - sink address
+    xaddrs - tuple containing source and sink address
     """
 
-    def __init__(self, saddr, taddr):
+    def __init__(self, xaddrs):
+        saddr, taddr = xaddrs
+
         self.saddr    = saddr
         self.taddr    = taddr
         self.ssock    = rep_socket(saddr)
@@ -138,12 +139,14 @@ class Source(pypb.abs.Close):
 
 class Sink(pypb.abs.Close):
     """
-    Sink(taddr) -- job sink socket
+    Sink(xaddrs) -- job sink socket
 
-    taddr - sink address
+    xaddrs - tuple containing source and sink address
     """
 
-    def __init__(self, taddr):
+    def __init__(self, xaddrs):
+        _, taddr = xaddrs
+
         self.taddr         = taddr
         self.tsock         = rep_socket(taddr)
         self.nworkers      = 0
@@ -188,13 +191,14 @@ class Sink(pypb.abs.Close):
 
 class Worker(pypb.abs.Close):
     """
-    Worker(saddr, taddr) -- job worker socket
+    Worker(xaddrs) -- job worker socket
 
-    saddr - source address
-    taddr - sink address
+    xaddrs - tuple containing source and sink address
     """
 
-    def __init__(self, saddr, taddr):
+    def __init__(self, xaddrs):
+        saddr, taddr = xaddrs
+
         self.saddr  = saddr
         self.taddr  = taddr
         self.ssock  = req_socket(saddr)
