@@ -78,10 +78,18 @@ def print_stats():
     print "Peak resident set size   : {:.2f} MiB".format(max_rss)
     sys.stdout.flush()
 
-def daemonize(logdir, prefix="daemon."):
+def daemonize(logdir, prefix=None):
     """
     Daemonize the process.
     """
+
+    # Default prefix is script name - the py prefix
+    if prefix is None:
+        prefix = sys.argv[0]
+        if prefix.endswith(".py"):
+            prefix = prefix[:-2]
+    if prefix[-1] != ".":
+        prefix = prefix + "."
 
     # Add start time to file prefix
     prefix = prefix + datetime.utcnow().strftime(LOGTIMEFMT)
@@ -99,6 +107,7 @@ def daemonize(logdir, prefix="daemon."):
 
     # Create the directory if not exists
     if not os.path.exists(logdir):
+        print "Folder '{}' doesn't exist. Creating ..."
         os.makedirs(logdir)
     
     # Do the redirection
