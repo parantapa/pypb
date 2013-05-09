@@ -107,7 +107,7 @@ def daemonize(logdir, prefix=None):
 
     # Create the directory if not exists
     if not os.path.exists(logdir):
-        print "Folder '{}' doesn't exist. Creating ..."
+        print "Folder '{}' doesn't exist. Creating ...".format(logdir)
         os.makedirs(logdir)
     
     # Do the redirection
