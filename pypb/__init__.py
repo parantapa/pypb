@@ -12,12 +12,11 @@ import signal
 import atexit
 import tempfile
 from datetime import datetime
+from functools import wraps
 
 import daemon
 import pypb.memusage as mu
-from functools import wraps
 
-LOGDIR = "/var/tmp/{}/pypb/logs/".format(os.environ["LOGNAME"])
 LOGTIMEFMT = "%Y-%m-%d_%H:%M:%S."
 
 # Define logger
@@ -79,7 +78,7 @@ def print_stats():
     print "Peak resident set size   : {:.2f} MiB".format(max_rss)
     sys.stdout.flush()
 
-def daemonize(prefix="daemon."):
+def daemonize(logdir, prefix="daemon."):
     """
     Daemonize the process.
     """
@@ -99,11 +98,11 @@ def daemonize(prefix="daemon."):
     }
 
     # Create the directory if not exists
-    if not os.path.exists(LOGDIR):
-        os.makedirs(LOGDIR)
+    if not os.path.exists(logdir):
+        os.makedirs(logdir)
     
     # Do the redirection
-    fobj = tempfile.NamedTemporaryFile(dir=LOGDIR, delete=False,
+    fobj = tempfile.NamedTemporaryFile(dir=logdir, delete=False,
                                        prefix=prefix, suffix=".log")
     dc.stdout = fobj
     dc.stderr = fobj
