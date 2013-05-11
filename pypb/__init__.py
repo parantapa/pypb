@@ -18,6 +18,7 @@ import daemon
 import pypb.pstat as pstat
 
 LOGTIMEFMT = "%Y-%m-%d_%H:%M:%S."
+MEGA = 2 ** 20
 
 # Define logger
 from logbook import Logger
@@ -69,13 +70,26 @@ def print_stats():
     # Note end time
     end = datetime.utcnow()
 
-    rt      = end - start
-    max_vm  = pstat.max_vm() / (2 ** 20)
-    max_rss = pstat.max_rss() / (2 ** 20)
+    rt          = end - start
+    max_vm      = pstat.max_vm() / MEGA
+    max_rss     = pstat.max_rss() / MEGA
+    io_read     = pstat.io_read() / MEGA
+    io_write    = pstat.io_write() / MEGA
+    dio_read    = pstat.disk_io_read() / MEGA
+    dio_write   = pstat.disk_io_write() / MEGA
+    vol_switch  = pstat.vol_ctxt_switches()
+    nvol_switch = pstat.nonvol_ctxt_switches()
 
-    print "Total running time       : {}".format(rt)
-    print "Peak virtual memory size : {:.2f} MiB".format(max_vm)
-    print "Peak resident set size   : {:.2f} MiB".format(max_rss)
+    print "Total running time             : {}".format(rt)
+    print "Peak virtual memory size       : {:.2f} MiB".format(max_vm)
+    print "Peak resident set size         : {:.2f} MiB".format(max_rss)
+    print "Total IO Read                  : {:.2f} MiB".format(io_read)
+    print "Total IO Write                 : {:.2f} MiB".format(io_write)
+    print "Disk IO Read                   : {:.2f} MiB".format(dio_read)
+    print "Disk IO Write                  : {:.2f} MiB".format(dio_write)
+    print "# Voluntary context switch     : {:,d}".format(vol_switch)
+    print "# Non-Voluntary context switch : {:,d}".format(nvol_switch)
+
     sys.stdout.flush()
 
 def daemonize(logdir, prefix=None):
