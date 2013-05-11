@@ -15,7 +15,7 @@ from datetime import datetime
 from functools import wraps
 
 import daemon
-import pypb.memusage as mu
+import pypb.pstat as pstat
 
 LOGTIMEFMT = "%Y-%m-%d_%H:%M:%S."
 
@@ -70,8 +70,8 @@ def print_stats():
     end = datetime.utcnow()
 
     rt      = end - start
-    max_vm  = mu.max_vm() / (2 ** 20)
-    max_rss = mu.max_rss() / (2 ** 20)
+    max_vm  = pstat.max_vm() / (2 ** 20)
+    max_rss = pstat.max_rss() / (2 ** 20)
 
     print "Total running time       : {}".format(rt)
     print "Peak virtual memory size : {:.2f} MiB".format(max_vm)
