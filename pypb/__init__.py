@@ -80,7 +80,7 @@ def print_stats():
     vol_switch  = pstat.vol_ctxt_switches()
     nvol_switch = pstat.nonvol_ctxt_switches()
 
-    print "Total running time             : {}".format(rt)
+    print "\n\nTotal running time         : {}".format(rt)
     print "Peak virtual memory size       : {:.2f} MiB".format(max_vm)
     print "Peak resident set size         : {:.2f} MiB".format(max_rss)
     print "Total IO Read                  : {:.2f} MiB".format(io_read)
@@ -176,4 +176,16 @@ class LoopCounter(object):
             self.logfn(msg, *args, **kwargs)
 
         self.counter += 1
+
+def iter_counter(iterable, msg, step=1, maxloop=-1, logfn=log.info):
+    """
+    Count loop iterations when in iterating over an iterable.
+    """
+
+    iterable = iter(iterable)
+
+    counter = LoopCounter(step, maxloop, logfn)
+    for item in iterable:
+        yield item
+        counter.log(msg)
 
