@@ -9,13 +9,20 @@ __author__  = "Parantapa Bhattacharya <pb@parantapa.net>"
 import time
 import atexit
 import multiprocessing as mp
+from itertools import islice
 
 from logbook import Logger
 log = Logger(__name__)
 
 class ProcessFarm(object):
     """
-    A simple process farm new processes are generated on spawn.
+    A simple process farm with used processes discarded.
+
+    Create new processes when needed using *spawn*. Number of processes that
+    may exist simultaniously is controlled by the constructor parameter
+    *max_workers*
+
+    NOTE: Registers an atexit handler to collect running processes.
     """
 
     def __init__(self, max_workers=None):
@@ -27,7 +34,7 @@ class ProcessFarm(object):
             self.max_workers = mp.cpu_count()
 
         # Register joinall to run at exit
-        atexit.register(self.joinall)
+        atexit.register(self.join_all)
 
     def spawn(self, func, *args, **kwargs):
         """
@@ -40,7 +47,7 @@ class ProcessFarm(object):
 
         # Join any finished processes
         while len(self.procs) > self.max_workers:
-            self.joinall(False)
+            self.join_finished()
             time.sleep(1)
 
         proc = mp.Process(target=func, args=args, kwargs=kwargs)
@@ -49,27 +56,93 @@ class ProcessFarm(object):
         # Add the process to the list of unjoined processes
         self.procs[proc.pid] = proc
 
-    def joinall(self, wait=True):
+    def join_finished(self):
         """
-        Join all unjoined processes.
-
-        wait - Wait for process to finish.
+        Join any finished child process.
         """
 
         for proc in self.procs.values():
-            if wait:
+            if not proc.is_alive():
                 proc.join()
                 del self.procs[proc.pid]
-            else:
-                if not proc.is_alive():
-                    proc.join()
-                    del self.procs[proc.pid]
 
-    def termall(self):
+    def join_all(self):
+        """
+        Join all unjoined child processes.
+        """
+
+        log.info("Trying to join all child processes ...")
+        for proc in self.procs.values():
+            proc.join()
+            del self.procs[proc.pid]
+
+    def term_all(self):
         """
         Kill any processes still running.
         """
 
+        log.info("Sending term signal to all child processes ...")
+
         for p in self.procs.values():
             p.terminate()
+
+class ImapEndMarker(object):
+    """
+    A special class which marks end of stream.
+    """
+
+    pass
+
+def imap_worker(func, qin, qout):
+    """
+    Fetch job from queue, run it and return back.
+    """
+
+    while True:
+        inp = qin.get()
+        if isinstance(inp, ImapEndMarker):
+            break
+        out = func(inp)
+        qout.put(out)
+
+def imap(func, iterable, qsize=100, nprocs=None):
+    """
+    Multiprocess imap function.
+
+    Uses multiple processes to speed up function evaluation.
+    """
+
+    iterable = iter(iterable)
+
+    # Create the data queues
+    qin     = mp.Queue(maxsize=qsize)
+    qout    = mp.Queue(maxsize=qsize)
+    pending = 0
+
+    # Create a process farm
+    farm = ProcessFarm(nprocs)
+    for _ in range(farm.max_workers):
+        farm.spawn(imap_worker, func, qin, qout)
+
+    try:
+        # Init the queues with inital data
+        for inp in islice(iterable, qsize):
+            qin.put(inp)
+            pending += 1
+
+        # Running phase
+        for inp in iterable:
+            out = qout.get()
+            qin.put(inp)
+            yield out
+
+        # Finish phase
+        while pending:
+            out = qout.get()
+            qin.put(ImapEndMarker())
+            pending -= 1
+            yield out
+    finally:
+        farm.term_all()
+        farm.join_all()
 
