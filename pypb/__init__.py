@@ -80,7 +80,8 @@ def print_stats():
     vol_switch  = pstat.vol_ctxt_switches()
     nvol_switch = pstat.nonvol_ctxt_switches()
 
-    print "\n\nTotal running time         : {}".format(rt)
+    print "\n"
+    print "Total running time             : {}".format(rt)
     print "Peak virtual memory size       : {:.2f} MiB".format(max_vm)
     print "Peak resident set size         : {:.2f} MiB".format(max_rss)
     print "Total IO Read                  : {:.2f} MiB".format(io_read)
