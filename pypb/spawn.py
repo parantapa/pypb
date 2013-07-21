@@ -7,12 +7,8 @@ from __future__ import division
 __author__  = "Parantapa Bhattacharya <pb@parantapa.net>"
 
 import time
-import atexit
 import multiprocessing as mp
 from itertools import islice
-
-from logbook import Logger
-log = Logger(__name__)
 
 class ProcessFarm(object):
     """
@@ -21,8 +17,6 @@ class ProcessFarm(object):
     Create new processes when needed using *spawn*. Number of processes that
     may exist simultaniously is controlled by the constructor parameter
     *max_workers*
-
-    NOTE: Registers an atexit handler to collect running processes.
     """
 
     def __init__(self, max_workers=None):
@@ -33,8 +27,11 @@ class ProcessFarm(object):
         else:
             self.max_workers = mp.cpu_count()
 
-        # Register joinall to run at exit
-        atexit.register(self.join_all)
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.join_all()
 
     def spawn(self, func, *args, **kwargs):
         """
@@ -71,7 +68,6 @@ class ProcessFarm(object):
         Join all unjoined child processes.
         """
 
-        log.info("Trying to join all child processes ...")
         for proc in self.procs.values():
             proc.join()
             del self.procs[proc.pid]
@@ -80,8 +76,6 @@ class ProcessFarm(object):
         """
         Kill any processes still running.
         """
-
-        log.info("Sending term signal to all child processes ...")
 
         for p in self.procs.values():
             p.terminate()
@@ -121,10 +115,12 @@ def imap(func, iterable, qsize=100, nprocs=None):
 
     # Create a process farm
     farm = ProcessFarm(nprocs)
-    for _ in range(farm.max_workers):
-        farm.spawn(imap_worker, func, qin, qout)
 
     try:
+        # Create requisite number of processes
+        for _ in range(farm.max_workers):
+            farm.spawn(imap_worker, func, qin, qout)
+
         # Init the queues with inital data
         for inp in islice(iterable, qsize):
             qin.put(inp)
