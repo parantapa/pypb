@@ -5,9 +5,10 @@ Source stolen from http://effbot.org/zone/re-sub.htm#unescape-html
 """
 
 __author__ = "Parantapa Bhattacharya <pb@parantapa.net>"
-__all__    = ["unescape"]
+__all__    = ["escape", "unescape"]
 
 import re
+import cgi
 from htmlentitydefs import name2codepoint
 
 def fixup(m):
@@ -42,5 +43,15 @@ def unescape(text):
     text - The HTML (or XML) source text.
     """
 
-    return re.sub("&#?\w+;", fixup, text)
+    return re.sub("&#?\\w+;", fixup, text)
+
+def escape(text):
+    """
+    Encode HTML special chars and non ascii stuff using XML entities.
+    Returns plain ascii text.
+
+    text - Unicode text to be encoded using HTML source.
+    """
+
+    return cgi.escape(text, True).encode("ascii", "xmlcharrefreplace")
 
