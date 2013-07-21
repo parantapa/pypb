@@ -10,7 +10,9 @@ import time
 import multiprocessing as mp
 from itertools import islice
 
-class ProcessFarm(object):
+import pypb.abs
+
+class ProcessFarm(pypb.abs.Close):
     """
     A simple process farm with used processes discarded.
 
@@ -27,10 +29,8 @@ class ProcessFarm(object):
         else:
             self.max_workers = mp.cpu_count()
 
-    def __enter__(self):
-        return self
-
-    def __exit__(self, exc_type, exc_value, traceback):
+    @pypb.abs.runonce
+    def close(self):
         self.join_all()
 
     def spawn(self, func, *args, **kwargs):
