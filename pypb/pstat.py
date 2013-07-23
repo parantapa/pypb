@@ -5,7 +5,6 @@ All results returned are in bytes.
 Recipe copied from http://code.activestate.com/recipes/286222-memory-usage/
 """
 
-__author__ = "Parantapa Bhattacharya <pb@parantapa.net>"
 __all__    = ["vm", "rss", "max_vm", "max_rss",
               "io_read", "io_write",
               "disk_io_read", "disk_io_write",

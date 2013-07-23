@@ -2,10 +2,6 @@
 Misc abstract classes and functions.
 """
 
-from __future__ import division
-
-__author__  = "Parantapa Bhattacharya <pb@parantapa.net>"
-
 import abc
 from functools import wraps
 

@@ -2,10 +2,6 @@
 Simple interface to python multiprocessing.
 """
 
-from __future__ import division
-
-__author__  = "Parantapa Bhattacharya <pb@parantapa.net>"
-
 import time
 import multiprocessing as mp
 from itertools import islice

@@ -4,7 +4,6 @@ Unescape xml entities to return unicode.
 Source stolen from http://effbot.org/zone/re-sub.htm#unescape-html
 """
 
-__author__ = "Parantapa Bhattacharya <pb@parantapa.net>"
 __all__    = ["escape", "unescape"]
 
 import re

@@ -4,8 +4,6 @@ A ZeroMQ socket wrapper implementing the MW4S pattern.
 MW4S - Muliple Worker, Single Source, Single Sink
 """
 
-__author__  = "Parantapa Bhattacharya <pb@parantapa.net>"
-
 import time
 import zmq
 
