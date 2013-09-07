@@ -21,6 +21,9 @@ start = datetime.utcnow()
 LOGTIMEFMT = "%Y-%m-%d_%H:%M:%S."
 MEGA = 2 ** 20
 
+# Cache directory to store results
+LOGDIR = "/var/tmp/{}/pypb/log/".format(os.environ["LOGNAME"])
+
 def exit_signal(signum, _):
     """
     Handle exit signal.
@@ -70,7 +73,7 @@ def print_stats():
 
     sys.stdout.flush()
 
-def daemonize(logdir, prefix=None):
+def daemonize(prefix=None):
     """
     Daemonize the process.
     """
@@ -98,12 +101,12 @@ def daemonize(logdir, prefix=None):
     }
 
     # Create the directory if not exists
-    if not os.path.exists(logdir):
-        print "Folder '{}' doesn't exist. Creating ...".format(logdir)
-        os.makedirs(logdir)
+    if not os.path.exists(LOGDIR):
+        print "Folder '{}' doesn't exist. Creating ...".format(LOGDIR)
+        os.makedirs(LOGDIR)
     
     # Do the redirection
-    fobj = tempfile.NamedTemporaryFile(dir=logdir, delete=False,
+    fobj = tempfile.NamedTemporaryFile(dir=LOGDIR, delete=False,
                                        prefix=prefix, suffix=".log")
     dc.stdout = fobj
     dc.stderr = fobj
