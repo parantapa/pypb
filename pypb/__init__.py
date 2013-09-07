@@ -2,30 +2,10 @@
 Utility functions needed at multiple places.
 """
 
-from __future__ import division
+from __future__ import division, print_function
 
-__author__ = "Parantapa Bhattacharya <pb@parantapa.net>"
-
-import os
-import sys
-import signal
-import atexit
-import tempfile
 from datetime import datetime
 from functools import wraps
-
-import daemon
-import pypb.pstat as pstat
-
-LOGTIMEFMT = "%Y-%m-%d_%H:%M:%S."
-MEGA = 2 ** 20
-
-# Define logger
-from logbook import Logger
-log = Logger(__name__)
-
-# Note start time
-start = datetime.utcnow()
 
 def coroutine(origfn):
     """
@@ -44,109 +24,12 @@ def coroutine(origfn):
 
     return wrapfn
 
-def exit_signal(signum, _):
-    """
-    Handle exit signal.
-    """
-
-    signame = "Unknown Signal"
-    for v, k in signal.__dict__.iteritems():
-        if v.startswith('SIG') and k == signum:
-            signame = v
-            break
-
-    msg = "{} : Received signal - {} ({})"
-    msg = msg.format(os.getpid(), signame, signum)
-    print msg
-    sys.stdout.flush()
-
-    sys.exit(0)
-
-def print_stats():
-    """
-    Print runtime and memory usage.
-    """
-
-    # Note end time
-    end = datetime.utcnow()
-
-    rt          = end - start
-    max_vm      = pstat.max_vm() / MEGA
-    max_rss     = pstat.max_rss() / MEGA
-    io_read     = pstat.io_read() / MEGA
-    io_write    = pstat.io_write() / MEGA
-    dio_read    = pstat.disk_io_read() / MEGA
-    dio_write   = pstat.disk_io_write() / MEGA
-    vol_switch  = pstat.vol_ctxt_switches()
-    nvol_switch = pstat.nonvol_ctxt_switches()
-
-    print "\n"
-    print "Total running time             : {}".format(rt)
-    print "Peak virtual memory size       : {:.2f} MiB".format(max_vm)
-    print "Peak resident set size         : {:.2f} MiB".format(max_rss)
-    print "Total IO Read                  : {:.2f} MiB".format(io_read)
-    print "Total IO Write                 : {:.2f} MiB".format(io_write)
-    print "Disk IO Read                   : {:.2f} MiB".format(dio_read)
-    print "Disk IO Write                  : {:.2f} MiB".format(dio_write)
-    print "# Voluntary context switch     : {:,d}".format(vol_switch)
-    print "# Non-Voluntary context switch : {:,d}".format(nvol_switch)
-
-    sys.stdout.flush()
-
-def daemonize(logdir, prefix=None):
-    """
-    Daemonize the process.
-    """
-
-    # Default prefix is script name - the py prefix
-    if prefix is None:
-        prefix = sys.argv[0]
-        if prefix.endswith(".py"):
-            prefix = prefix[:-2]
-    if prefix[-1] != ".":
-        prefix = prefix + "."
-
-    # Add start time to file prefix
-    prefix = prefix + datetime.utcnow().strftime(LOGTIMEFMT)
-
-    # Setup context
-    dc = daemon.DaemonContext()
-    dc.working_directory = "."
-    dc.umask = 0o022
-    dc.signal_map = {
-        signal.SIGINT:  exit_signal,
-        signal.SIGQUIT: exit_signal,
-        signal.SIGHUP:  exit_signal,
-        signal.SIGTERM: exit_signal
-    }
-
-    # Create the directory if not exists
-    if not os.path.exists(logdir):
-        print "Folder '{}' doesn't exist. Creating ...".format(logdir)
-        os.makedirs(logdir)
-    
-    # Do the redirection
-    fobj = tempfile.NamedTemporaryFile(dir=logdir, delete=False,
-                                       prefix=prefix, suffix=".log")
-    dc.stdout = fobj
-    dc.stderr = fobj
-
-    # Print outfile name to follow
-    print "STDOUT:", fobj.name
-    sys.stdout.flush()
-
-    # Daemonize
-    dc.open()
-
-    # Register the print stats function in daemon
-    atexit.register(print_stats)
-
 class LoopCounter(object):
     """
     Count loop iterations.
     """
 
-    def __init__(self, step=1, maxloop=-1, logfn=log.info):
+    def __init__(self, step=1, maxloop=-1, logfn=print):
         self.start = datetime.utcnow()
         self.step = int(step)
         self.counter = 1
@@ -178,7 +61,7 @@ class LoopCounter(object):
 
         self.counter += 1
 
-def iter_counter(iterable, msg, step=1, maxloop=-1, logfn=log.info):
+def iter_counter(iterable, msg, step=1, maxloop=-1, logfn=print):
     """
     Count loop iterations when in iterating over an iterable.
     """
