@@ -6,14 +6,13 @@ from __future__ import division
 
 import os
 import sys
-import signal
 import atexit
 import tempfile
 from datetime import datetime
 
 import daemon
 
-from pypb import exit_signal
+from pypb import exit_signal, STD_EXIT_SIGNALS
 from pypb.pstat import print_stats
 
 # Constants
@@ -42,12 +41,7 @@ def daemonize(prefix=None):
     dc = daemon.DaemonContext()
     dc.working_directory = "."
     dc.umask = 0o022
-    dc.signal_map = {
-        signal.SIGINT:  exit_signal,
-        signal.SIGQUIT: exit_signal,
-        signal.SIGHUP:  exit_signal,
-        signal.SIGTERM: exit_signal
-    }
+    dc.signal_map = dict.fromkeys(STD_EXIT_SIGNALS, exit_signal)
 
     # Create the directory if not exists
     if not os.path.exists(LOGDIR):

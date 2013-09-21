@@ -11,6 +11,14 @@ import signal
 from datetime import datetime
 from functools import wraps
 
+# Standard exit signals not handled by Python directly
+STD_EXIT_SIGNALS = [
+    signal.SIGINT,
+    signal.SIGQUIT,
+    signal.SIGHUP,
+    signal.SIGTERM
+]
+
 def exit_signal(signum, _):
     """
     Handle exit signal.
@@ -28,6 +36,14 @@ def exit_signal(signum, _):
     sys.stdout.flush()
 
     sys.exit(0)
+
+def register_exit_signals():
+    """
+    Register exit handler for the standard exit signals.
+    """
+
+    for n in STD_EXIT_SIGNALS:
+        signal.signal(n, exit_signal)
 
 def coroutine(origfn):
     """
