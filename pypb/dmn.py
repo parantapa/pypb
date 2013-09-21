@@ -12,66 +12,15 @@ import tempfile
 from datetime import datetime
 
 import daemon
-import pypb.pstat as pstat
 
-# Note start time
-start = datetime.utcnow()
+from pypb import exit_signal
+from pypb.pstat import print_stats
 
 # Constants
 LOGTIMEFMT = "%Y-%m-%d_%H:%M:%S."
-MEGA = 2 ** 20
 
 # Cache directory to store results
 LOGDIR = "/var/tmp/{}/pypb/log/".format(os.environ["LOGNAME"])
-
-def exit_signal(signum, _):
-    """
-    Handle exit signal.
-    """
-
-    signame = "Unknown Signal"
-    for v, k in signal.__dict__.iteritems():
-        if v.startswith('SIG') and k == signum:
-            signame = v
-            break
-
-    msg = "{} : Received signal - {} ({})"
-    msg = msg.format(os.getpid(), signame, signum)
-    print msg
-    sys.stdout.flush()
-
-    sys.exit(0)
-
-def print_stats():
-    """
-    Print runtime and memory usage.
-    """
-
-    # Note end time
-    end = datetime.utcnow()
-
-    rt          = end - start
-    max_vm      = pstat.max_vm() / MEGA
-    max_rss     = pstat.max_rss() / MEGA
-    io_read     = pstat.io_read() / MEGA
-    io_write    = pstat.io_write() / MEGA
-    dio_read    = pstat.disk_io_read() / MEGA
-    dio_write   = pstat.disk_io_write() / MEGA
-    vol_switch  = pstat.vol_ctxt_switches()
-    nvol_switch = pstat.nonvol_ctxt_switches()
-
-    print "\n"
-    print "Total running time             : {}".format(rt)
-    print "Peak virtual memory size       : {:.2f} MiB".format(max_vm)
-    print "Peak resident set size         : {:.2f} MiB".format(max_rss)
-    print "Total IO Read                  : {:.2f} MiB".format(io_read)
-    print "Total IO Write                 : {:.2f} MiB".format(io_write)
-    print "Disk IO Read                   : {:.2f} MiB".format(dio_read)
-    print "Disk IO Write                  : {:.2f} MiB".format(dio_write)
-    print "# Voluntary context switch     : {:,d}".format(vol_switch)
-    print "# Non-Voluntary context switch : {:,d}".format(nvol_switch)
-
-    sys.stdout.flush()
 
 def daemonize(prefix=None):
     """
@@ -104,7 +53,7 @@ def daemonize(prefix=None):
     if not os.path.exists(LOGDIR):
         print "Folder '{}' doesn't exist. Creating ...".format(LOGDIR)
         os.makedirs(LOGDIR)
-    
+
     # Do the redirection
     fobj = tempfile.NamedTemporaryFile(dir=LOGDIR, delete=False,
                                        prefix=prefix, suffix=".log")

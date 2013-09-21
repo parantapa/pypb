@@ -4,8 +4,30 @@ Utility functions needed at multiple places.
 
 from __future__ import division, print_function
 
+import os
+import sys
+import signal
+
 from datetime import datetime
 from functools import wraps
+
+def exit_signal(signum, _):
+    """
+    Handle exit signal.
+    """
+
+    signame = "Unknown Signal"
+    for v, k in signal.__dict__.iteritems():
+        if v.startswith('SIG') and k == signum:
+            signame = v
+            break
+
+    msg = "{} : Received signal - {} ({})"
+    msg = msg.format(os.getpid(), signame, signum)
+    print(msg)
+    sys.stdout.flush()
+
+    sys.exit(0)
 
 def coroutine(origfn):
     """
