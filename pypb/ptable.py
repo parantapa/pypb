@@ -2,7 +2,13 @@
 Pretty print Tables.
 """
 
-def str_tab(xss, fmts):
+import textwrap
+from itertools import izip_longest
+
+# Default value for the maximum column width
+MAX_COL_WIDTH = 70
+
+def str_tab(xss, fmts, maxws):
     """
     Convert the values in the 2d array to strings.
     """
@@ -11,10 +17,13 @@ def str_tab(xss, fmts):
     for xs in xss:
         ys = []
         for i, x in enumerate(xs):
-            fmt = fmts.get(i, u"")
+            fmt  = fmts.get(i, u"")
+            maxw = maxws.get(i, MAX_COL_WIDTH)
             y = u"{0:{fmt}}".format(x, fmt=fmt)
+            y = textwrap.wrap(y, maxw)
             ys.append(y)
-        yss.append(ys)
+        for zs in izip_longest(*ys, fillvalue=u""):
+            yss.append(zs)
     
     return yss
 
@@ -52,7 +61,7 @@ def align_tab(xss, widths, aligns, fills):
 
     return yss
 
-def fmt_tab(xss, fmts=None, aligns=None, fills=None):
+def fmt_tab(xss, fmts=None, aligns=None, fills=None, maxws=None):
     """
     Return 2d array of strings correcly formatted, padded, and aligned.
     """
@@ -60,20 +69,21 @@ def fmt_tab(xss, fmts=None, aligns=None, fills=None):
     fmts   = {} if fmts is None else fmts
     aligns = {} if aligns is None else aligns
     fills  = {} if fills is None else fills
+    maxws  = {} if maxws is None else maxws
 
-    xss = str_tab(xss, fmts)
+    xss = str_tab(xss, fmts, maxws)
     widths = max_col_widths(xss)
     xss = align_tab(xss, widths, aligns, fills)
 
     return xss
 
-def simple_fmt_tab(xss, fmts=None, aligns=None, fills=None,
+def simple_fmt_tab(xss, fmts=None, aligns=None, fills=None, maxws=None,
                    cstart=u"| ", cend=u" |", csep=u" | "):
     """
     Create a text formatted table.
     """
 
-    xss = fmt_tab(xss, fmts=fmts, aligns=aligns, fills=fills)
+    xss = fmt_tab(xss, fmts=fmts, aligns=aligns, fills=fills, maxws=maxws)
     xss = [cstart + csep.join(xs) + cend for xs in xss]
     xss = u"\n".join(xss)
     return xss
