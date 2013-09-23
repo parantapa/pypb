@@ -9,13 +9,9 @@ Module dependencies:
 
 All modules depend on Logbook. Other dependecies are given here.
 
-* pypb              - daemon
-* pypb.cache        - None
-* pypb.dist         - zmq
-* pypb.gsb          - requests
-* pypb.req          - requests
-* pypb.iter_recipes - None
-* pypb.unescape     - None
+* pypb.dist - zmq
+* pypb.dmn  - daemon
+* pypb.req  - requests
 
 Disclaimer
 ----------
