@@ -66,14 +66,8 @@ def diskcache(origfn):
         """
 
         # Steal some parameters
-        force_miss   = kwargs.get("_force_miss", False)
-        force_before = kwargs.get("_force_before", datetime.utcnow())
-
-        # Remove stolen parameters
-        if "_force_miss" in kwargs:
-            del kwargs["_force_miss"]
-        if "_force_before" in kwargs:
-            del kwargs["_force_before"]
+        force_miss   = kwargs.pop("force_miss", False)
+        force_before = kwargs.pop("force_before", datetime.utcnow())
 
         # Compute the function code and argument hash
         runhash = cPickle.dumps((fhash, args, kwargs))
