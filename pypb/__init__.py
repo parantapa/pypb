@@ -11,6 +11,9 @@ import signal
 from datetime import datetime
 from functools import wraps
 
+from logbook import Logger
+log = Logger(__name__)
+
 # Standard exit signals not handled by Python directly
 STD_EXIT_SIGNALS = [
     signal.SIGINT,
@@ -67,7 +70,7 @@ class LoopCounter(object):
     Count loop iterations.
     """
 
-    def __init__(self, step=1, maxloop=-1, logfn=print):
+    def __init__(self, step=1, maxloop=-1, logfn=log.info):
         self.start = datetime.utcnow()
         self.step = int(step)
         self.counter = 1
