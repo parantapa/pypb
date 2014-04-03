@@ -14,7 +14,7 @@ def progress(iterable, msg=None, total=None, mininterval=1, logfn=print):
     """
     Print progress of loop iteration.
 
-    iterable    - Iterable to loop over
+    iterable    - Iterable to loop over.
     msg         - The msg used to display progress.
     total       - Total number of items in the iterable.
     mininterval - Minimum number of seconds to wait before updating progress/
@@ -23,11 +23,11 @@ def progress(iterable, msg=None, total=None, mininterval=1, logfn=print):
     The format method of the `msg' parameter is called with the following
     keyword arguments before updating the progress.
 
-    count      : Number of items already iterated over
-    percentage : Percentage of items already iterated over
-    elapsed    : Time elapsed since beginning of loop
-    eta        : Expected time for the loop to finish
-    speed      : Number of items iterated per second
+    count      : Number of items already iterated over.
+    percentage : Percentage of items already iterated over.
+    elapsed    : Time elapsed since beginning of loop.
+    eta        : Expected time for the loop to finish.
+    speed      : Number of items iterated per second.
     """
 
     # Initialize
