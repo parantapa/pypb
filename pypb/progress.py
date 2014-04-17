@@ -80,7 +80,10 @@ def progress(iterable, msg=None, total=None, mininterval=1, logfn=print, clean=N
             else:
                 kwargs["eta"] = "Unknown"
                 kwargs["percentage"] = "Unknown"
-            kwargs["speed"] = count / (now - start).seconds
+            try:
+                kwargs["speed"] = count / (now - start).seconds
+            except ZeroDivisionError:
+                kwargs["speed"] = "Unknown"
             if clean:
                 print("\r" + " " * len(lastmsg), end="")
                 lastmsg = "\r" + msg.format(**kwargs)
@@ -103,7 +106,10 @@ def progress(iterable, msg=None, total=None, mininterval=1, logfn=print, clean=N
     else:
         kwargs["eta"] = "Unknown"
         kwargs["percentage"] = "Unknown"
-    kwargs["speed"] = count / (now - start).seconds
+    try:
+        kwargs["speed"] = count / (now - start).seconds
+    except ZeroDivisionError:
+        kwargs["speed"] = "Unknown"
     if clean:
         print("\r" + " " * len(lastmsg), end="")
         lastmsg = "\r" + msg.format(**kwargs)
