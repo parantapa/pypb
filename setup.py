@@ -15,4 +15,10 @@ setup(
         "pyzmq",
         "requests",
     ],
+    classifiers=[
+        "Development Status :: 3 - Alpha",
+        "Operating System :: POSIX :: Linux",
+        "Programming Language :: Python :: 2.7",
+        "Topic :: Utilities"
+    ],
 )
