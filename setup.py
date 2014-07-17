@@ -2,7 +2,7 @@ from distutils.core import setup
 
 setup(
     name             = 'PyPB',
-    version          = '0.1',
+    version          = '0.2',
     author           = 'Parantapa Bhattacharya',
     author_email     = 'pb@parantapa.net',
     packages         = ['pypb'],
