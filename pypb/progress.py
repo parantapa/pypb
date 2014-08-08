@@ -7,9 +7,24 @@ from __future__ import division, print_function
 import sys
 from datetime import datetime, timedelta
 
-DEFAULT_MSG = ("Count: {count:,d} Percentage: {percentage:.1f} "
-               "Elapsed: {elapsed} ETA: {eta} "
-               "Speed: {speed} Loops/Second")
+DEFAULT_MSG = ("{count:,d} ({percentage:.1f} %) "
+               "- elapsed: {elapsed} - eta: {eta} "
+               "- {speed:.2f} loops/sec")
+
+def timedelta_format(td):
+    """
+    Return a better string for timedelta object.
+    """
+
+    if isinstance(td, (str, unicode)):
+        return td
+
+    mm, ss = divmod(td.seconds, 60)
+    hh, mm = divmod(mm, 60)
+    s = "%d:%02d:%02d" % (hh, mm, ss)
+    if td.days:
+        s = "%d day%s, " % (td.days, "s" if td.days > 1 else "") + s
+    return s
 
 def progress(iterable, msg=None, total=None, mininterval=1, logfn=print, clean=None):
     """
@@ -78,12 +93,15 @@ def progress(iterable, msg=None, total=None, mininterval=1, logfn=print, clean=N
                 kwargs["eta"] = ((now - start) // count) * (total - count)
                 kwargs["percentage"] = count / total * 100
             else:
-                kwargs["eta"] = "Unknown"
-                kwargs["percentage"] = "Unknown"
+                kwargs["eta"] = "unknown"
+                kwargs["percentage"] = float("nan")
             try:
                 kwargs["speed"] = count / (now - start).seconds
             except ZeroDivisionError:
-                kwargs["speed"] = "Unknown"
+                kwargs["speed"] = float("nan")
+
+            kwargs["elapsed"] = timedelta_format(kwargs["elapsed"])
+            kwargs["eta"] = timedelta_format(kwargs["eta"])
             if clean:
                 print("\r" + " " * len(lastmsg), end="")
                 lastmsg = "\r" + msg.format(**kwargs)
@@ -104,12 +122,15 @@ def progress(iterable, msg=None, total=None, mininterval=1, logfn=print, clean=N
         kwargs["eta"] = ((now - start) // count) * (total - count)
         kwargs["percentage"] = count / total * 100
     else:
-        kwargs["eta"] = "Unknown"
-        kwargs["percentage"] = "Unknown"
+        kwargs["eta"] = now - now
+        kwargs["percentage"] = float("nan")
     try:
         kwargs["speed"] = count / (now - start).seconds
     except ZeroDivisionError:
-        kwargs["speed"] = "Unknown"
+        kwargs["speed"] = float("nan")
+
+    kwargs["elapsed"] = timedelta_format(kwargs["elapsed"])
+    kwargs["eta"] = timedelta_format(kwargs["eta"])
     if clean:
         print("\r" + " " * len(lastmsg), end="")
         lastmsg = "\r" + msg.format(**kwargs)
@@ -124,3 +145,12 @@ def prange(*args, **kwargs):
     """
 
     return progress(xrange(*args), **kwargs)
+
+def main():
+    import time
+    for i in prange(10):
+        time.sleep(1)
+
+if __name__ == "__main__":
+    main()
+
