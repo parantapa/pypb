@@ -84,3 +84,24 @@ class ProcessFarm(pypb.abs.Close):
 
         for p in self.procs.values():
             p.terminate()
+
+def join_ssw(join_all, src, snk, wps, inq, outq, sentinel=None):
+    """
+    Join source sink and workers.
+    """
+
+    # Wait for src to finish
+    join_all([src])
+
+    # Send sentinel to workers
+    for _ in wps:
+        inq.put(sentinel)
+
+    # Wait for workers to finish
+    join_all(wps)
+
+    # Send sentinel to sink
+    outq.put(sentinel)
+
+    # Wait for sink to finish
+    join_all([snk])
