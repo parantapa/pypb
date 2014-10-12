@@ -26,6 +26,39 @@ def timedelta_format(td):
         s = "%d day%s, " % (td.days, "s" if td.days > 1 else "") + s
     return s
 
+def make_progress_kwargs(start, now, count, total):
+    """
+    Make progress func kwargs.
+    """
+
+    elapsed = now - start
+
+    if total is not None and count > 0:
+        eta = (elapsed // count) * (total - count)
+        percentage = count / total * 100
+    else:
+        eta = "unknown"
+        percentage = float("nan")
+
+    if elapsed.seconds > 0:
+        speed = count / elapsed.seconds
+    else:
+        speed = float("nan")
+
+    elapsed = timedelta_format(elapsed)
+    eta = timedelta_format(eta)
+
+    return locals()
+
+def clean_print(newmsg, lastmsg):
+    """
+    Print a new msg by overwriting the last msg on screen.
+    """
+
+    print("\r" + " " * len(lastmsg), end="")
+    print("\r" + newmsg, end="")
+    sys.stdout.flush()
+
 def progress(iterable, msg=None, total=None, mininterval=1, logfn=print, clean=None):
     """
     Print progress of loop iteration.
@@ -38,7 +71,7 @@ def progress(iterable, msg=None, total=None, mininterval=1, logfn=print, clean=N
     clean       - If True re-use one line to print output; False otherwise
                   Default is 'auto'. Note: Make sure to set clean=False
                   if using a custom logfn. Otherwise it will ignore logfn
-                  if stdout is a tty. This assumes that the
+                  if stdout is a tty.
 
     The format method of the `msg' parameter is called with the following
     keyword arguments before updating the progress.
@@ -49,7 +82,6 @@ def progress(iterable, msg=None, total=None, mininterval=1, logfn=print, clean=N
     eta        : Expected time for the loop to finish.
     speed      : Number of items iterated per second.
     """
-
 
     # Initialize
     start = datetime.utcnow()
@@ -71,10 +103,8 @@ def progress(iterable, msg=None, total=None, mininterval=1, logfn=print, clean=N
         except TypeError:
             total = None
 
-    if clean:
-        lastmsg = ""
-        print(lastmsg)
-
+    # Go to a new line for printing
+    lastmsg = ""
 
     # Yield an item
     for item in iterable:
@@ -86,58 +116,26 @@ def progress(iterable, msg=None, total=None, mininterval=1, logfn=print, clean=N
 
         # If enough time has passed print the progress
         if now - last >= mininterval:
-            kwargs = {}
-            kwargs["count"] = count
-            kwargs["elapsed"] = now - start
-            if total is not None:
-                kwargs["eta"] = ((now - start) // count) * (total - count)
-                kwargs["percentage"] = count / total * 100
-            else:
-                kwargs["eta"] = "unknown"
-                kwargs["percentage"] = float("nan")
-            try:
-                kwargs["speed"] = count / (now - start).seconds
-            except ZeroDivisionError:
-                kwargs["speed"] = float("nan")
-
-            kwargs["elapsed"] = timedelta_format(kwargs["elapsed"])
-            kwargs["eta"] = timedelta_format(kwargs["eta"])
+            kwargs = make_progress_kwargs(start, now, count, total)
+            newmsg = msg.format(**kwargs)
             if clean:
-                print("\r" + " " * len(lastmsg), end="")
-                lastmsg = "\r" + msg.format(**kwargs)
-                print(lastmsg, end="")
-                sys.stdout.flush()
+                clean_print(newmsg, lastmsg)
             else:
-                logfn(msg.format(**kwargs))
+                logfn(newmsg)
 
             # Update the time
             last = now
+            lastmsg = newmsg
 
     # Make sure to print the last output line
     now = datetime.utcnow()
-    kwargs = {}
-    kwargs["count"] = count
-    kwargs["elapsed"] = now - start
-    if total is not None:
-        kwargs["eta"] = ((now - start) // count) * (total - count)
-        kwargs["percentage"] = count / total * 100
-    else:
-        kwargs["eta"] = now - now
-        kwargs["percentage"] = float("nan")
-    try:
-        kwargs["speed"] = count / (now - start).seconds
-    except ZeroDivisionError:
-        kwargs["speed"] = float("nan")
 
-    kwargs["elapsed"] = timedelta_format(kwargs["elapsed"])
-    kwargs["eta"] = timedelta_format(kwargs["eta"])
+    kwargs = make_progress_kwargs(start, now, count, total)
     if clean:
-        print("\r" + " " * len(lastmsg), end="")
-        lastmsg = "\r" + msg.format(**kwargs)
-        print(lastmsg)
-        sys.stdout.flush()
+        clean_print(newmsg, lastmsg)
+        print("")
     else:
-        logfn(msg.format(**kwargs))
+        logfn(newmsg)
 
 def prange(*args, **kwargs):
     """
