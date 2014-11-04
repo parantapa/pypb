@@ -8,7 +8,6 @@ __author__ = "Parantapa Bhattachara <pb [at] parantapa [dot] net>"
 
 import gzip
 import codecs
-import os.path
 
 class Dict(object):
     """
@@ -60,15 +59,4 @@ class Dict(object):
         test = len(enws) / len(ws) > self.lang_perc
 
         return test
-
-def en_dict_fname():
-    """
-    Return the location of the english dictionary.
-    """
-
-    fname = __file__
-    fname = os.path.abspath(fname)
-    fname = os.path.dirname(fname)
-    fname = os.path.join(fname, "data", "english-words-hunspell-US-GB.txt.gz")
-    return fname
 
