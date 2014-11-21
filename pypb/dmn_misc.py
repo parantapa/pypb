@@ -33,5 +33,5 @@ def dmn_cmd(cmd, pfname, ofname="/dev/null"):
     Wrap the given command in nohup and save pid to file.
     """
 
-    fmt = "nohup {} </dev/null >>{} 2>&1 & echo $! > {}"
+    fmt = "{{ nohup {} </dev/null >>{} 2>&1 & echo $! > {} ; }}"
     return fmt.format(cmd, ofname, pfname)
