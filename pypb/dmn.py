@@ -31,6 +31,8 @@ def daemonize(prefix=None):
         prefix = sys.argv[0]
         if prefix.endswith(".py"):
             prefix = prefix[:-2]
+        # Clean the prefix as it is uses in a filename
+        prefix = "".join(c if (c.isalnum() or c in "-_.") else "_" for c in prefix)
     if prefix[-1] != ".":
         prefix = prefix + "."
 
