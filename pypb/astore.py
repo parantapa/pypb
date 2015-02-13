@@ -17,7 +17,7 @@ def make_consistant(fname):
 
     if os.path.exists(fname + TMP_SUFFIX):
         if os.path.exists(fname):
-            os.path.remove(fname)
+            os.remove(fname)
         os.rename(fname + TMP_SUFFIX, fname)
 
 def read(fname, mode="rb"):
