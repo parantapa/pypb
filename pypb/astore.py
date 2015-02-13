@@ -29,7 +29,7 @@ def read(fname, mode="rb"):
     with open(fname, mode) as fobj:
         return fobj.read()
 
-def write(fname, text, mode="wb"):
+def write(text, fname, mode="wb"):
     """
     Write contents to the file.
     """
