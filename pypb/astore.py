@@ -3,6 +3,9 @@
 Read and write data to a text file atomically.
 
 http://stackoverflow.com/questions/2333872/atomic-writing-to-file-with-python
+
+NOTE: Wont work on Non-POSIX systems
+NOTE: Wont work with Python3
 """
 
 import __builtin__
