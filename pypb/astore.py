@@ -5,38 +5,60 @@ Read and write data to a text file atomically.
 http://stackoverflow.com/questions/2333872/atomic-writing-to-file-with-python
 """
 
+import __builtin__
 import os
-import os.path
+from contextlib import contextmanager
+
+import gzip
+import codecs
 
 TMP_SUFFIX = ".astore-tmp"
 
-def make_consistant(fname):
+@contextmanager
+def _open(func, name, mode="rb", *args, **kwargs):
     """
-    Make the data consistant.
-    """
-
-    if os.path.exists(fname + TMP_SUFFIX):
-        if os.path.exists(fname):
-            os.remove(fname)
-        os.rename(fname + TMP_SUFFIX, fname)
-
-def read(fname, mode="rb"):
-    """
-    Slurp contents of the file.
+    Make sure the data is written atomically.
     """
 
-    make_consistant(fname)
-    with open(fname, mode) as fobj:
-        return fobj.read()
+    # Xor of the two conditions
+    assert ("w" in mode) != ("r" in mode)
 
-def write(text, fname, mode="wb"):
+    # Which file to operate on?
+    if "r" in mode:
+        fname = name
+    else: # w in mode
+        fname = name + TMP_SUFFIX
+
+    with func(fname, mode, *args, **kwargs) as fobj:
+        yield fobj
+
+        # In case of write flush and sync
+        if "w" in mode:
+            fobj.flush()
+            os.fsync(fobj.fileno())
+
+    # In case of write: do atomic switch
+    if "w" in mode:
+        os.rename(fname, name)
+
+def open(*args, **kwargs):
     """
-    Write contents to the file.
+    Atomic context manager for open.
     """
 
-    with open(fname + TMP_SUFFIX, mode) as fobj:
-        fobj.write(text)
-        fobj.flush()
-        os.fsync(fobj.fileno())
-    make_consistant(fname)
+    return _open(__builtin__.open, *args, **kwargs)
+
+def gzip_open(*args, **kwargs):
+    """
+    Atomic context manager for gzip.open
+    """
+
+    return _open(gzip.open, *args, **kwargs)
+
+def codecs_open(*args, **kwargs):
+    """
+    Atomic context mangager for codecs.open
+    """
+
+    return _open(codecs.open, *args, **kwargs)
 
