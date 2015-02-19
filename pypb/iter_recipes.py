@@ -55,14 +55,14 @@ def padnone(iterable):
 
     Useful for emulating the behavior of the built-in map() function.
     """
-    
+
     return chain(iterable, repeat(None))
 
 def ncycles(iterable, n):
     """
     Returns the sequence elements n times
     """
-    
+
     return chain.from_iterable(repeat(tuple(iterable), n))
 
 def dotproduct(vec1, vec2):
@@ -76,7 +76,7 @@ def flatten(listOfLists):
     """
     Flatten one level of nesting
     """
-    
+
     return chain.from_iterable(listOfLists)
 
 def repeatfunc(func, times=None, *args):
@@ -85,7 +85,7 @@ def repeatfunc(func, times=None, *args):
 
     Example:  repeatfunc(random.random)
     """
-    
+
     if times is None:
         return starmap(func, repeat(args))
     return starmap(func, repeat(args, times))
@@ -102,17 +102,33 @@ def pairwise(iterable):
 def grouper(n, iterable, fillvalue=None):
     """
     Collect data into fixed-length chunks or blocks
-    
+
     # grouper(3, 'ABCDEFG', 'x') --> ABC DEF Gxx
     """
 
     args = [iter(iterable)] * n
     return izip_longest(fillvalue=fillvalue, *args)
 
+def chunks(n, iterable):
+    """
+    Collect data into fixed-length chunks or blocks
+
+    # chunks(3, 'ABCDEFG') --> ABC DEF G
+    """
+
+    iterable = iter(iterable)
+
+    while True:
+        chnk = take(n, iterable)
+        if chnk:
+            yield chnk
+        else:
+            break
+
 def roundrobin(*iterables):
     """
     roundrobin('ABC', 'D', 'EF') --> A D E B F C
-    
+
     # Recipe credited to George Sakkis
     """
 
@@ -159,11 +175,11 @@ def unique_justseen(iterable, key=None):
     """
     List unique elements, preserving order.
     Remember only the element just seen.
-    
+
     # unique_justseen('AAAABBBCCDAABBB') --> A B C D A B
     # unique_justseen('ABBCcAD', str.lower) --> A B C A D
     """
-    
+
     return imap(next, imap(operator.itemgetter(1), groupby(iterable, key)))
 
 def iter_except(func, exception, first=None):
