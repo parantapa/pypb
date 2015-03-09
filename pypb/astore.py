@@ -6,11 +6,14 @@ http://stackoverflow.com/questions/2333872/atomic-writing-to-file-with-python
 
 NOTE: Wont work on Non-POSIX systems
 NOTE: Wont work with Python3
+NOTE: Only supports read and write (not append or r+ or w+ modes)
 """
 
 import __builtin__
 import os
+import os.path
 from contextlib import contextmanager
+from tempfile import NamedTemporaryFile as ntf
 
 import gzip
 import codecs
@@ -26,23 +29,29 @@ def _open(func, name, mode="rb", *args, **kwargs):
     # Xor of the two conditions
     assert ("w" in mode) != ("r" in mode)
 
-    # Which file to operate on?
+    # In read mode we have to do nothing
     if "r" in mode:
-        fname = name
-    else: # w in mode
-        fname = name + TMP_SUFFIX
+        return func(name, mode, *args, **kwargs)
 
-    with func(fname, mode, *args, **kwargs) as fobj:
+    # Get the filename parts
+    fname = os.path.abspath(name)
+    prefix = os.path.basename(fname) + "-"
+    dirname = os.path.dirname(fname)
+
+    # Create the empty temporary file
+    tobj = ntf(prefix=prefix, suffix=TMP_SUFFIX, dir=dirname, delete=False)
+    tname = tobj.name
+    tobj.close()
+
+    # Reopen the file with proper func
+    with func(tname, mode, *args, **kwargs) as fobj:
         yield fobj
 
-        # In case of write flush and sync
-        if "w" in mode:
-            fobj.flush()
-            os.fsync(fobj.fileno())
+        fobj.flush()
+        os.fsync(fobj.fileno())
 
-    # In case of write: do atomic switch
-    if "w" in mode:
-        os.rename(fname, name)
+    # Now the atomic switch
+    os.rename(tname, fname)
 
 def open(*args, **kwargs):
     """
@@ -51,14 +60,14 @@ def open(*args, **kwargs):
 
     return _open(__builtin__.open, *args, **kwargs)
 
-def gzip_open(*args, **kwargs):
+def gopen(*args, **kwargs):
     """
     Atomic context manager for gzip.open
     """
 
     return _open(gzip.open, *args, **kwargs)
 
-def codecs_open(*args, **kwargs):
+def copen(*args, **kwargs):
     """
     Atomic context mangager for codecs.open
     """
