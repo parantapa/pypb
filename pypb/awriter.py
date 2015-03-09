@@ -1,6 +1,6 @@
 # encoding: utf-8
 """
-Read and write data to a text file atomically.
+Write files atomically.
 
 http://stackoverflow.com/questions/2333872/atomic-writing-to-file-with-python
 
@@ -21,7 +21,7 @@ import codecs
 TMP_SUFFIX = ".astore-tmp"
 
 @contextmanager
-def _open(func, name, mode="rb", *args, **kwargs):
+def awriter(func, name, mode="rb", *args, **kwargs):
     """
     Make sure the data is written atomically.
     """
@@ -58,19 +58,19 @@ def open(*args, **kwargs):
     Atomic context manager for open.
     """
 
-    return _open(__builtin__.open, *args, **kwargs)
+    return awriter(__builtin__.open, *args, **kwargs)
 
 def gopen(*args, **kwargs):
     """
     Atomic context manager for gzip.open
     """
 
-    return _open(gzip.open, *args, **kwargs)
+    return awriter(gzip.open, *args, **kwargs)
 
 def copen(*args, **kwargs):
     """
     Atomic context mangager for codecs.open
     """
 
-    return _open(codecs.open, *args, **kwargs)
+    return awriter(codecs.open, *args, **kwargs)
 
