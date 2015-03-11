@@ -9,7 +9,6 @@ All modules depend on Logbook. Other dependecies are given here.
 
 * pypb.dist - zmq
 * pypb.dmn  - daemon
-* pypb.req  - requests
 
 ## Disclaimer
 
