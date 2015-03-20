@@ -31,7 +31,8 @@ def awriter(func, name, mode="rb", *args, **kwargs):
 
     # In read mode we have to do nothing
     if "r" in mode:
-        return func(name, mode, *args, **kwargs)
+        yield func(name, mode, *args, **kwargs)
+        return
 
     # Get the filename parts
     fname = os.path.abspath(name)
