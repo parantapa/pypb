@@ -131,6 +131,7 @@ def progress(iterable, msg=None, total=None, mininterval=1, logfn=print, clean=N
     now = datetime.utcnow()
 
     kwargs = make_progress_kwargs(start, now, count, total)
+    newmsg = msg.format(**kwargs)
     if clean:
         clean_print(newmsg, lastmsg)
         print("")
