@@ -1,3 +1,4 @@
 logbook
 python-daemon
+gevent
 # pyzmq

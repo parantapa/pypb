@@ -1,68 +1,33 @@
 """
-Simple interface to python multiprocessing.
+Simple interface to python multi-tasking.
 """
 
-import time
 import multiprocessing as mp
+
+import gevent
+import gevent.queue as gq
 
 import pypb.abs
 
-# Add multiprocessing.Queue in namespace
-Queue = mp.Queue
-
-class ProcessFarm(pypb.abs.Close):
+def cpu_count():
     """
-    A simple process farm with used processes discarded.
-
-    Create new processes when needed using *spawn*. Number of processes that
-    may exist simultaniously is controlled by the constructor parameter
-    *max_workers*
+    Return the CPU count.
     """
 
-    def __init__(self, max_workers=None):
-        self.procs = dict()
+    return mp.cpu_count()
 
-        if max_workers is not None:
-            self.max_workers = int(max_workers)
-        else:
-            self.max_workers = mp.cpu_count()
+class TaskFarm(pypb.abs.Close):
+    """
+    Base class for task farms.
+    """
+
+    def __init__(self):
+        self.procs = set()
 
     @pypb.abs.runonce
     def close(self):
-        self.term_all()
+        self.kill_all()
         self.join_all()
-
-    def spawn(self, func, *args, **kwargs):
-        """
-        Spawn a new process.
-
-        func     - The func to be run in the new process.
-        *args    - The positional arguments for _func_
-        **kwargs - The keyword arguments for _func_
-        """
-
-        # Join any finished processes
-        while len(self.procs) > self.max_workers:
-            self.join_finished()
-            time.sleep(1)
-
-        proc = mp.Process(target=func, args=args, kwargs=kwargs)
-        proc.start()
-
-        # Add the process to the list of unjoined processes
-        self.procs[proc.pid] = proc
-
-        return proc
-
-    def join_finished(self):
-        """
-        Join any finished child process.
-        """
-
-        for proc in self.procs.values():
-            if not proc.is_alive():
-                proc.join()
-                del self.procs[proc.pid]
 
     def join_all(self, procs=None):
         """
@@ -70,18 +35,112 @@ class ProcessFarm(pypb.abs.Close):
         """
 
         if procs is None:
-            procs = self.procs.values()
+            procs = list(self.procs)
 
         for proc in procs:
-            proc.join()
-            if proc.pid in self.procs:
-                del self.procs[proc.pid]
+            if proc in self.procs:
+                self.join(proc)
+                self.procs.discard(proc)
 
-    def term_all(self):
+    def kill_all(self):
         """
         Kill any processes still running.
         """
 
-        for p in self.procs.values():
-            p.terminate()
+        procs = list(self.procs)
+        for proc in procs:
+            self.kill(proc)
+
+    def spawn(self, func, *args, **kwargs):
+        raise NotImplementedError()
+
+    def make_queue(self, maxsize=0):
+        raise NotImplementedError()
+
+    def kill(self, proc):
+        raise NotImplementedError()
+
+    def join(self, proc):
+        raise NotImplementedError()
+
+class ProcessFarm(TaskFarm):
+    """
+    Spawn processes.
+    """
+
+    def spawn(self, func, *args, **kwargs):
+        """
+        Spawn a new process.
+
+        func       - The func to be run in the new process.
+        *args      - The positional arguments for _func_
+        **kwargs   - The keyword arguments for _func_
+        """
+
+        proc = mp.Process(target=func, args=args, kwargs=kwargs)
+        proc.start()
+        self.procs.add(proc)
+
+        return proc
+
+    def kill(self, proc):
+        """
+        Kill the given process.
+        """
+
+        return proc.terminate()
+
+    def join(self, proc):
+        """
+        Join the process.
+        """
+
+        return proc.join()
+
+    def make_queue(self, maxsize=0):
+        """
+        Create a queue.
+        """
+
+        return mp.Queue(maxsize)
+
+class GreenletFarm(TaskFarm):
+    """
+    Spawn greenlets.
+    """
+
+    def spawn(self, func, *args, **kwargs):
+        """
+        Spawn a new greenlet.
+
+        func       - The func to be run in the new greenlets.
+        *args      - The positional arguments for _func_
+        **kwargs   - The keyword arguments for _func_
+        """
+
+        proc = gevent.spawn(func, *args, **kwargs)
+        self.procs.add(proc)
+
+        return proc
+
+    def kill(self, proc):
+        """
+        Kill the greenlet.
+        """
+
+        return proc.kill()
+
+    def join(self, proc):
+        """
+        Join the greenlet.
+        """
+
+        return proc.join()
+
+    def make_queue(self, maxsize=0):
+        """
+        Create a queue.
+        """
+
+        return gq.Queue(maxsize)
 
