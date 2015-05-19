@@ -57,10 +57,10 @@ class TaskFarm(pypb.abs.Close):
     def make_queue(self, maxsize=0):
         raise NotImplementedError()
 
-    def kill(self, proc):
+    def _kill(self, proc):
         raise NotImplementedError()
 
-    def join(self, proc):
+    def _join(self, proc):
         raise NotImplementedError()
 
 class ProcessFarm(TaskFarm):
@@ -83,14 +83,14 @@ class ProcessFarm(TaskFarm):
 
         return proc
 
-    def kill(self, proc):
+    def _kill(self, proc):
         """
         Kill the given process.
         """
 
         return proc.terminate()
 
-    def join(self, proc):
+    def _join(self, proc):
         """
         Join the process.
         """
@@ -123,14 +123,14 @@ class GreenletFarm(TaskFarm):
 
         return proc
 
-    def kill(self, proc):
+    def _kill(self, proc):
         """
         Kill the greenlet.
         """
 
         return proc.kill()
 
-    def join(self, proc):
+    def _join(self, proc):
         """
         Join the greenlet.
         """
