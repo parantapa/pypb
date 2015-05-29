@@ -39,7 +39,7 @@ class TaskFarm(pypb.abs.Close):
 
         for proc in procs:
             if proc in self.procs:
-                self.join(proc)
+                self._join(proc)
                 self.procs.discard(proc)
 
     def kill_all(self):
@@ -49,7 +49,7 @@ class TaskFarm(pypb.abs.Close):
 
         procs = list(self.procs)
         for proc in procs:
-            self.kill(proc)
+            self._kill(proc)
 
     def spawn(self, func, *args, **kwargs):
         raise NotImplementedError()
