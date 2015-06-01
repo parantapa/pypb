@@ -6,6 +6,7 @@ import multiprocessing as mp
 
 import gevent
 import gevent.queue as gq
+import setproctitle as spt
 
 import pypb.abs
 
@@ -63,10 +64,26 @@ class TaskFarm(pypb.abs.Close):
     def _join(self, proc):
         raise NotImplementedError()
 
+def proc_init_run(procnum, func, args, kwargs):
+    """
+    Set the process title and run.
+    """
+
+    title = spt.getproctitle()
+    title = "{} : {} : {}".format(title, procnum, func.__name__)
+    spt.setproctitle(title)
+
+    return func(*args, **kwargs)
+
 class ProcessFarm(TaskFarm):
     """
     Spawn processes.
     """
+
+    def __init__(self):
+        super(ProcessFarm, self).__init__()
+
+        self.procnum = 0
 
     def spawn(self, func, *args, **kwargs):
         """
@@ -77,7 +94,10 @@ class ProcessFarm(TaskFarm):
         **kwargs   - The keyword arguments for _func_
         """
 
-        proc = mp.Process(target=func, args=args, kwargs=kwargs)
+        self.procnum += 1
+
+        proc = mp.Process(target=proc_init_run, args=(
+            self.procnum, func, args, kwargs))
         proc.start()
         self.procs.add(proc)
 

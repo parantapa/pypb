@@ -1,4 +1,5 @@
 logbook
 python-daemon
 gevent
+setproctitle
 # pyzmq
