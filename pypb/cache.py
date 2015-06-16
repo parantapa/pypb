@@ -13,8 +13,7 @@ import inspect
 from datetime import datetime
 from functools import wraps
 
-# Cache directory to store results
-CACHEDIR = "/var/tmp/{}/pypb/cache/".format(os.environ["LOGNAME"])
+from pypb import canonical_path
 
 from logbook import Logger
 log = Logger(__name__)
@@ -46,58 +45,66 @@ def fnhash(fn):
 
     return source
 
-def diskcache(origfn):
+def diskcache(cachedir="~/.cache/pypb_diskcache"):
     """
     Return a function which memoizes the result of the original function.
     """
 
-    # If cachedir doesn't exist, create it
-    if not os.path.exists(CACHEDIR):
-        log.notice("Creating cache folder at {} ...", CACHEDIR)
-        os.makedirs(CACHEDIR)
+    cachedir = canonical_path(cachedir)
 
-    # Get the function hash
-    fhash = fnhash(origfn)
+    def decorator_fn(origfn): # pylint: disable=missing-docstring
 
-    @wraps(origfn)
-    def newfn(*args, **kwargs):
-        """
-        Return result from cache if possible.
-        """
+        # If cachedir doesn't exist, create it
+        if not os.path.exists(cachedir):
+            log.notice("Creating cache folder at {} ...", cachedir)
+            os.makedirs(cachedir)
 
-        # Steal some parameters
-        force_miss   = kwargs.pop("force_miss", False)
-        force_before = kwargs.pop("force_before", datetime.utcnow())
+        # Get the function hash
+        fhash = fnhash(origfn)
 
-        # Compute the function code and argument hash
-        runhash = cPickle.dumps((fhash, args, kwargs))
-        runhash = hashlib.sha1(runhash).hexdigest()
-        fname = CACHEDIR + runhash + ".pickle"
+        @wraps(origfn)
+        def newfn(*args, **kwargs):
+            """
+            Return result from cache if possible.
+            """
 
-        # Cache hit
-        if os.path.exists(fname) and not force_miss:
-            log.info("Cache hit for {} in {} ...", origfn.__name__, origfn.func_code.co_filename)
-            with open(fname, "rb") as fobj:
-                ret = cPickle.load(fobj)
-            if ret["at"] < force_before:
-                return ret["result"]
-            log.info("Cache result too old skipping ...")
+            # Steal some parameters
+            force_miss   = kwargs.pop("force_miss", False)
+            force_before = kwargs.pop("force_before", datetime.utcnow())
 
-        # Cache miss
-        log.info("Cache miss for {} in {} ...", origfn.__name__, origfn.func_code.co_filename)
-        ret = {
-            "at"            : datetime.utcnow(),
-            "func_name"     : origfn.__name__,
-            "func_filename" : origfn.func_code.co_filename,
-            "func_source"   : inspect.getsource(origfn),
-            "args"          : args,
-            "kwargs"        : kwargs,
-            "runhash"       : runhash,
-            "result"        : origfn(*args, **kwargs),
-        }
-        with open(fname, "wb") as fobj:
-            cPickle.dump(ret, fobj, -1)
-        return ret["result"]
+            # Compute the function code and argument hash
+            runhash = cPickle.dumps((fhash, args, kwargs), -1)
+            runhash = hashlib.sha1(runhash).hexdigest()
+            fname = "{}/{}.pickle".format(cachedir, runhash)
 
-    return newfn
+            # Cache hit
+            if os.path.exists(fname) and not force_miss:
+                log.info("Cache hit for {} in {} ...",
+                         origfn.__name__, origfn.func_code.co_filename)
+                with open(fname, "rb") as fobj:
+                    ret = cPickle.load(fobj)
+                if ret["at"] < force_before:
+                    return ret["result"]
+                log.info("Cache result too old skipping ...")
+
+            # Cache miss
+            log.info("Cache miss for {} in {} ...",
+                     origfn.__name__, origfn.func_code.co_filename)
+            ret = {
+                "at"            : datetime.utcnow(),
+                "func_name"     : origfn.__name__,
+                "func_filename" : origfn.func_code.co_filename,
+                "func_source"   : inspect.getsource(origfn),
+                "args"          : args,
+                "kwargs"        : kwargs,
+                "runhash"       : runhash,
+                "result"        : origfn(*args, **kwargs),
+            }
+            with open(fname, "wb") as fobj:
+                cPickle.dump(ret, fobj, -1)
+            return ret["result"]
+
+        return newfn
+
+    return decorator_fn
 

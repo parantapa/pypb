@@ -13,15 +13,13 @@ from datetime import datetime
 import daemon
 
 from pypb import exit_signal, STD_EXIT_SIGNALS
+from pypb import fnamechar, canonical_path
 from pypb.pstat import print_stats
 
 # Constants
-LOGTIMEFMT = "%Y-%m-%d_%H:%M:%S."
+LOGTIMEFMT = "%Y-%m-%dT%H:%M:%S."
 
-# Cache directory to store results
-LOGDIR = "/var/tmp/{}/pypb/log/".format(os.environ["LOGNAME"])
-
-def daemonize(prefix=None):
+def daemonize(prefix=None, logdir="~"):
     """
     Daemonize the process.
     """
@@ -32,7 +30,7 @@ def daemonize(prefix=None):
         if prefix.endswith(".py"):
             prefix = prefix[:-2]
         # Clean the prefix as it is uses in a filename
-        prefix = "".join(c if (c.isalnum() or c in "-_.") else "_" for c in prefix)
+        prefix = "".join(c if fnamechar(c) else "_" for c in prefix)
     if prefix[-1] != ".":
         prefix = prefix + "."
 
@@ -46,12 +44,13 @@ def daemonize(prefix=None):
     dc.signal_map = dict.fromkeys(STD_EXIT_SIGNALS, exit_signal)
 
     # Create the directory if not exists
-    if not os.path.exists(LOGDIR):
-        print "Folder '{}' doesn't exist. Creating ...".format(LOGDIR)
-        os.makedirs(LOGDIR)
+    logdir = canonical_path(logdir)
+    if not os.path.exists(logdir):
+        print "Folder '{}' doesn't exist. Creating ...".format(logdir)
+        os.makedirs(logdir)
 
     # Do the redirection
-    fobj = tempfile.NamedTemporaryFile(dir=LOGDIR, delete=False,
+    fobj = tempfile.NamedTemporaryFile(dir=logdir, delete=False,
                                        prefix=prefix, suffix=".log")
     dc.stdout = fobj
     dc.stderr = fobj
@@ -65,3 +64,4 @@ def daemonize(prefix=None):
 
     # Register the print stats function in daemon
     atexit.register(print_stats)
+

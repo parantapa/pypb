@@ -70,7 +70,7 @@ class TimeoutException(Exception):
     Raised by the time_limit context manager.
     """
 
-def timeout_handler(_, __):
+def timeout_handler(_a, _b): # pylint: disable=unused-argument
     """
     Handle the timeout signal.
     """
@@ -91,3 +91,19 @@ def timelimit(seconds):
         yield
     finally:
         signal.alarm(0)
+
+def canonical_path(path):
+    """
+    Return the canonical path.
+    """
+
+    path = os.path.expanduser(path)
+    path = os.path.abspath(path)
+    return path
+
+def fnamechar(c):
+    """
+    Check if char is a valid filename char.
+    """
+
+    return (c.isalnum() or c in "-_.") # pylint: disable=superfluous-parens
