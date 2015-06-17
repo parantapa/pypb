@@ -12,8 +12,6 @@ Create compressed json objects.
 
 from __future__ import division, print_function
 
-__author__ = "Parantapa Bhattachara <pb [at] parantapa [dot] net>"
-
 import sys
 import gzip
 import json
