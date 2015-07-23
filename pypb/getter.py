@@ -16,9 +16,10 @@ def simple_itemgetter(key):
 
     # Make sure all pieces are non empty
     for k in ks:
-        assert k
+        if not k:
+            raise ValueError("Key part cannot be empty")
 
-    ndots = len(ks)
+    ndots = len(ks) - 1
     if ndots == 0:
 
         def func(obj):
