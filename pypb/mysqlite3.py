@@ -26,20 +26,10 @@ def dumps_compact(obj, _dumps=json.dumps):
 
     return _dumps(obj, separators=(",",":"))
 
-def loads_none(obj, _loads=json.loads):
-    """
-    Json loader with None handler.
-    """
-
-    if obj is None:
-        return None
-
-    return _loads(obj)
-
 sqlite3.register_adapter(list, dumps_compact)
 sqlite3.register_adapter(tuple, dumps_compact)
 sqlite3.register_adapter(dict, dumps_compact)
-sqlite3.register_converter("json", loads_none)
+sqlite3.register_converter("json", json.loads)
 
 def connect(database, *args, **kwargs):
     """
