@@ -61,6 +61,9 @@ def twitter_timestamp(text,
     Convert the Twitter time string to timestamp.
     """
 
+    if text is None:
+        return None
+
     d = _strptime(text, "%a %b %d %H:%M:%S +0000 %Y")
     d = d.timetuple()
     return _timegm(d)
