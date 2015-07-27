@@ -5,60 +5,67 @@ Measure the progress of loops.
 from __future__ import division, print_function
 
 import sys
-from datetime import datetime, timedelta
+import time as _time
 
 DEFAULT_MSG = ("{count:,d} ({percentage:.1f} %) "
                "- elapsed: {elapsed} - eta: {eta} "
                "- {speed:.2f} loops/sec")
 
-def timedelta_format(td):
+def td_fmt(td):
     """
-    Return a better string for timedelta object.
+    Humanize time difference in seconds.
     """
 
-    if isinstance(td, (str, unicode)):
-        return td
+    if not td:
+        return "unknown"
 
-    mm, ss = divmod(td.seconds, 60)
+    td = int(td)
+
+    mm, ss = divmod(td, 60)
     hh, mm = divmod(mm, 60)
+    dd, hh = divmod(hh, 24)
+
     s = "%d:%02d:%02d" % (hh, mm, ss)
-    if td.days:
-        s = "%d day%s, " % (td.days, "s" if td.days > 1 else "") + s
+    if dd:
+        s = "%d day%s, " % (dd, "s" if dd > 1 else "") + s
     return s
 
-def make_progress_kwargs(start, now, count, total):
+# pylint: disable=unused-variable
+def make_kwargs(start, total, now, count, pnow, pcount):
     """
-    Make progress func kwargs.
+    Make kwargs for progress func.
     """
 
-    elapsed = now - start
+    td = now - pnow
 
-    if total is not None and count > 0:
-        eta = (elapsed // count) * (total - count)
+    # Compute speed
+    if td:
+        speed = (count - pcount) / td
+    else:
+        speed = 0.0
+
+    # Compute percentage
+    if total:
         percentage = count / total * 100
     else:
-        eta = "unknown"
-        percentage = float("nan")
+        percentage = 0.0
 
-    if elapsed.seconds > 0:
-        speed = count / elapsed.seconds
+    # Compute eta
+    if total and speed:
+        eta = (total - count) / speed
     else:
-        speed = float("nan")
+        eta = 0.0
 
-    elapsed = timedelta_format(elapsed)
-    eta = timedelta_format(eta)
+    # Compute elapsed
+    elapsed = now - start
+
+    # Format int
+    eta = td_fmt(eta)
+    elapsed = td_fmt(elapsed)
 
     return locals()
 
-def clean_print(newmsg, lastmsg):
-    """
-    Print a new msg by overwriting the last msg on screen.
-    """
-
-    print("\r" + " " * len(lastmsg), end="")
-    print("\r" + newmsg, end="")
-    sys.stdout.flush()
-
+# pylint: disable=line-too-long
 def progress(iterable, msg=None, total=None, mininterval=1, logfn=print, clean=None):
     """
     Print progress of loop iteration.
@@ -83,12 +90,14 @@ def progress(iterable, msg=None, total=None, mininterval=1, logfn=print, clean=N
     speed      : Number of items iterated per second.
     """
 
+    # Speed hack
+    time = _time.time
+
     # Initialize
-    start = datetime.utcnow()
+    start = time()
     count = 0
-    mininterval = timedelta(seconds=mininterval)
-    last = start
     msg = DEFAULT_MSG if msg is None else msg
+    msg_fmt = msg.format
 
     # Setup clean
     if clean not in (True, False, None):
@@ -96,14 +105,26 @@ def progress(iterable, msg=None, total=None, mininterval=1, logfn=print, clean=N
     if clean is None and "\n" not in msg:
         clean = sys.stdout.isatty()
 
+    # Define the print function
+    if clean:
+        def myprint(newmsg, lastmsg):
+            print("\r" + " " * len(lastmsg), end="")
+            print("\r" + newmsg, end="")
+            sys.stdout.flush()
+    else:
+        def myprint(newmsg, _):
+            logfn(newmsg)
+
     # try to get the number of loops from here
     if total is None:
         try:
             total = len(iterable)
         except TypeError:
-            total = None
+            total = 0
 
     # Go to a new line for printing
+    pnow = start
+    pcount = count
     lastmsg = ""
 
     # Yield an item
@@ -112,31 +133,25 @@ def progress(iterable, msg=None, total=None, mininterval=1, logfn=print, clean=N
 
         # Update count and get current time
         count += 1
-        now = datetime.utcnow()
+        now = time()
 
         # If enough time has passed print the progress
-        if now - last >= mininterval:
-            kwargs = make_progress_kwargs(start, now, count, total)
-            newmsg = msg.format(**kwargs)
-            if clean:
-                clean_print(newmsg, lastmsg)
-            else:
-                logfn(newmsg)
+        if now - pnow >= mininterval:
+            kwargs = make_kwargs(start, total, now, count, pnow, pcount)
+            newmsg = msg_fmt(**kwargs)
+            myprint(newmsg, lastmsg)
 
             # Update the time
-            last = now
+            pnow = now
+            pcount = count
             lastmsg = newmsg
 
     # Make sure to print the last output line
-    now = datetime.utcnow()
+    now = time()
 
-    kwargs = make_progress_kwargs(start, now, count, total)
-    newmsg = msg.format(**kwargs)
-    if clean:
-        clean_print(newmsg, lastmsg)
-        print("")
-    else:
-        logfn(newmsg)
+    kwargs = make_kwargs(start, total, now, count, pnow, pcount)
+    newmsg = msg_fmt(**kwargs)
+    myprint(newmsg, lastmsg)
 
 def prange(*args, **kwargs):
     """
@@ -146,9 +161,9 @@ def prange(*args, **kwargs):
     return progress(xrange(*args), **kwargs)
 
 def main():
-    import time
-    for i in prange(10):
-        time.sleep(1)
+    for i in prange(1000000):
+        # _time.sleep(1)
+        pass
 
 if __name__ == "__main__":
     main()
