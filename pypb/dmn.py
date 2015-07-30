@@ -8,6 +8,7 @@ import os
 import sys
 import atexit
 import tempfile
+import signal
 from datetime import datetime
 
 import daemon
@@ -49,6 +50,10 @@ def daemonize(prefix=None, logdir="~"):
         print "Folder '{}' doesn't exist. Creating ...".format(logdir)
         os.makedirs(logdir)
 
+    # Ignore SIGHUP
+    # Otherwise the child might get SIGHUP in our setup
+    signal.signal(signal.SIGHUP, signal.SIG_IGN)
+
     # Do the redirection
     fobj = tempfile.NamedTemporaryFile(dir=logdir, delete=False,
                                        prefix=prefix, suffix=".log")
@@ -64,4 +69,3 @@ def daemonize(prefix=None, logdir="~"):
 
     # Register the print stats function in daemon
     atexit.register(print_stats)
-
