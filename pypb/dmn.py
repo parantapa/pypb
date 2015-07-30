@@ -50,10 +50,6 @@ def daemonize(prefix=None, logdir="~"):
         print "Folder '{}' doesn't exist. Creating ...".format(logdir)
         os.makedirs(logdir)
 
-    # Ignore SIGHUP
-    # Otherwise the child might get SIGHUP in our setup
-    signal.signal(signal.SIGHUP, signal.SIG_IGN)
-
     # Do the redirection
     fobj = tempfile.NamedTemporaryFile(dir=logdir, delete=False,
                                        prefix=prefix, suffix=".log")
@@ -63,6 +59,10 @@ def daemonize(prefix=None, logdir="~"):
     # Print outfile name to follow
     print "STDOUT:", fobj.name
     sys.stdout.flush()
+
+    # Ignore SIGHUP before daemonizeing
+    # Otherwise the child might get a SIGHUP when daemonizing
+    signal.signal(signal.SIGHUP, signal.SIG_IGN)
 
     # Daemonize
     dc.open()
