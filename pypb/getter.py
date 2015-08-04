@@ -79,9 +79,24 @@ def deep_itemgetter(key):
 
     return func
 
+def list_itemgetter(idx):
+    """
+    Return a function which return the item at the given index.
+    """
+
+    def func(obj):
+        return obj[idx]
+
+    return func
+
 def make_getter(key):
     """
     Return the function to call for the key.
     """
 
-    return deep_itemgetter(key)
+    if isinstance(key, (str, unicode)):
+        return deep_itemgetter(key)
+    elif isinstance(key, int):
+        return list_itemgetter(key)
+    else:
+        raise ValueError("Keys can be integer or string only")
