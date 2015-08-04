@@ -5,8 +5,6 @@ Simple wrappper for standard sqlite3 with certain options set in.
 
 import json
 import sqlite3
-import calendar
-from datetime import datetime
 
 # Boolean
 sqlite3.register_adapter(bool, int)
@@ -43,18 +41,4 @@ def connect(database, *args, **kwargs):
     con = sqlite3.connect(database, *args, **kwargs)
 
     return con
-
-def twitter_timestamp(text,
-                      _strptime=datetime.strptime,
-                      _timegm=calendar.timegm):
-    """
-    Convert the Twitter time string to timestamp.
-    """
-
-    if text is None:
-        return None
-
-    d = _strptime(text, "%a %b %d %H:%M:%S +0000 %Y")
-    d = d.timetuple()
-    return _timegm(d)
 
