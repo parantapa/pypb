@@ -92,12 +92,13 @@ def timelimit(seconds):
     finally:
         signal.alarm(0)
 
-def canonical_path(path):
+def abspath(path):
     """
     Return the canonical path.
     """
 
     path = os.path.expanduser(path)
+    path = os.path.expandvars(path)
     path = os.path.abspath(path)
     return path
 
