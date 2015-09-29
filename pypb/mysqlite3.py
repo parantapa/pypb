@@ -8,7 +8,7 @@ import sqlite3
 
 # Boolean
 sqlite3.register_adapter(bool, int)
-sqlite3.register_converter("boolean", bool)
+# sqlite3.register_converter("boolean", bool)
 
 # Timestamp
 sqlite3.register_converter("timestamp", int)
@@ -27,7 +27,7 @@ def dumps_compact(obj, _dumps=json.dumps):
 sqlite3.register_adapter(list, dumps_compact)
 sqlite3.register_adapter(tuple, dumps_compact)
 sqlite3.register_adapter(dict, dumps_compact)
-sqlite3.register_converter("json", json.loads)
+# sqlite3.register_converter("json", json.loads)
 
 def connect(database, *args, **kwargs):
     """
