@@ -14,7 +14,7 @@ from datetime import datetime
 import daemon
 
 from pypb import exit_signal, STD_EXIT_SIGNALS
-from pypb import fnamechar, canonical_path
+from pypb import fnamechar, abspath
 from pypb.pstat import print_stats
 
 # Constants
@@ -45,7 +45,7 @@ def daemonize(prefix=None, logdir="~"):
     dc.signal_map = dict.fromkeys(STD_EXIT_SIGNALS, exit_signal)
 
     # Create the directory if not exists
-    logdir = canonical_path(logdir)
+    logdir = abspath(logdir)
     if not os.path.exists(logdir):
         print "Folder '{}' doesn't exist. Creating ...".format(logdir)
         os.makedirs(logdir)

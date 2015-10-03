@@ -13,7 +13,7 @@ import inspect
 from datetime import datetime
 from functools import wraps
 
-from pypb import canonical_path
+from pypb import abspath
 
 from logbook import Logger
 log = Logger(__name__)
@@ -50,7 +50,7 @@ def diskcache(cachedir="~/.cache/pypb_diskcache"):
     Return a function which memoizes the result of the original function.
     """
 
-    cachedir = canonical_path(cachedir)
+    cachedir = abspath(cachedir)
 
     def decorator_fn(origfn): # pylint: disable=missing-docstring
 
