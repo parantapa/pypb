@@ -6,6 +6,8 @@ Simple wrappper for standard sqlite3 with certain options set in.
 import json
 import sqlite3
 
+Row = sqlite3.Row
+
 # Boolean
 sqlite3.register_adapter(bool, int)
 # sqlite3.register_converter("boolean", bool)
