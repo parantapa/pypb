@@ -9,7 +9,6 @@ import sys
 import signal
 
 from functools import wraps
-from contextlib import contextmanager
 
 from logbook import Logger
 log = Logger(__name__)
@@ -64,33 +63,6 @@ def coroutine(origfn):
         return cr
 
     return wrapfn
-
-class TimeoutException(Exception):
-    """
-    Raised by the time_limit context manager.
-    """
-
-def timeout_handler(_a, _b): # pylint: disable=unused-argument
-    """
-    Handle the timeout signal.
-    """
-
-    raise TimeoutException()
-
-@contextmanager
-def timelimit(seconds):
-    """
-    Finish the function within a time limit.
-
-    NOTE: Uses SIGALRM for this.
-    """
-
-    signal.signal(signal.SIGALRM, timeout_handler)
-    signal.alarm(seconds)
-    try:
-        yield
-    finally:
-        signal.alarm(0)
 
 def abspath(path):
     """
