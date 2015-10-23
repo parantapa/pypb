@@ -44,3 +44,20 @@ def connect(database, *args, **kwargs):
 
     return con
 
+def speedup(con,
+            no_journal=True,
+            set_page_size=False,
+            cache_size=1024 * 512):
+    """
+    Setup some pragmas for sqlite3 speedup.
+    """
+
+    con.execute("pragma synchronous = off")
+    con.execute("pragma cache_size = -%d" % cache_size)
+    con.execute("pragma secure_delete = off")
+
+    if no_journal:
+        con.execute("pragma journal_mode = off")
+
+    if set_page_size:
+        con.execute("pragma page_size = 65536")
