@@ -3,6 +3,7 @@ Simple interface to python multi-tasking.
 """
 
 import sys
+import abc
 import time
 import multiprocessing as mp
 
@@ -12,53 +13,61 @@ import setproctitle as spt
 
 import pypb.abs
 
-def cpu_count():
-    """
-    Return the CPU count.
-    """
-
-    return mp.cpu_count()
+cpu_count = mp.cpu_count
 
 class TaskFarm(pypb.abs.Close):
     """
     Base class for task farms.
     """
 
+    __metaclass__ = abc.ABCMeta
+
     def __init__(self):
         self.procs = set()
-        self.timeout = None
 
     @pypb.abs.runonce
     def close(self):
         self.kill_all()
         self.join_all()
 
-    def join_all(self, procs=None, wait=True):
+    def _join_all_any(self, procs, return_on_any):
         """
-        Join all unjoined child processes.
+        Join processes.
         """
 
         if procs is None:
-            local_procs = set(self.procs)
-        else:
-            local_procs = set(procs)
+            procs = set(self.procs)
 
-        while local_procs:
-            for p in list(local_procs):
+        count_joined = 0
+        while procs:
+            for p in list(procs):
                 assert p in self.procs
 
                 if self._is_alive(p):
-                    if self._has_timedout(p):
-                        self._kill(p)
-
-                if self._is_alive(p): continue
+                    continue
 
                 self._join(p)
                 self.procs.discard(p)
-                local_procs.discard(p)
+                procs.discard(p)
+                count_joined += 1
 
-            if not wait: return
+            if return_on_any and count_joined > 0:
+                return
             time.sleep(1)
+
+    def join_all(self, procs=None):
+        """
+        Wait till all the processes have finished.
+        """
+
+        self._join_all_any(procs, False)
+
+    def join_any(self, procs=None):
+        """
+        Wait till any one of the processes finishes.
+        """
+
+        self._join_all_any(procs, True)
 
     def kill_all(self):
         """
@@ -69,23 +78,25 @@ class TaskFarm(pypb.abs.Close):
         for proc in procs:
             self._kill(proc)
 
+    @abc.abstractmethod
     def spawn(self, func, *args, **kwargs):
-        raise NotImplementedError()
+        pass
 
+    @abc.abstractmethod
     def make_queue(self, maxsize=0):
-        raise NotImplementedError()
+        pass
 
+    @abc.abstractmethod
     def _kill(self, proc):
-        raise NotImplementedError()
+        pass
 
+    @abc.abstractmethod
     def _join(self, proc):
-        raise NotImplementedError()
+        pass
 
+    @abc.abstractmethod
     def _is_alive(self, proc):
-        raise NotImplementedError()
-
-    def _has_timedout(self, proc):
-        raise NotImplementedError()
+        pass
 
 def proc_init_run(procnum, func, args, kwargs):
     """
@@ -103,12 +114,11 @@ class ProcessFarm(TaskFarm):
     Spawn processes.
     """
 
-    def __init__(self, max_procs=sys.maxsize, timeout=None):
+    def __init__(self, max_procs=sys.maxsize):
         super(ProcessFarm, self).__init__()
 
         self.procnum = 0
         self.max_procs = max_procs
-        self.timeout = timeout
 
     def spawn(self, func, *args, **kwargs):
         """
@@ -119,37 +129,29 @@ class ProcessFarm(TaskFarm):
         **kwargs   - The keyword arguments for _func_
         """
 
-        while len(self.procs) >= self.max_procs:
-            self.join_all(wait=False)
-            time.sleep(1.0)
+        if len(self.procs) == self.max_procs:
+            self.join_any()
 
         self.procnum += 1
 
         pargs = (self.procnum, func, args, kwargs)
-        p = mp.Process(target=proc_init_run, args=pargs)
-        p.start()
-
-        proc = (time.time(), p)
+        proc = mp.Process(target=proc_init_run, args=pargs)
+        proc.start()
         self.procs.add(proc)
 
         return proc
 
-    def _kill(self, proc):
-        return proc[1].terminate()
-
-    def _join(self, proc):
-        return proc[1].join()
-
-    def _is_alive(self, proc):
-        return proc[1].is_alive()
-
-    def _has_timedout(self, proc):
-        if self.timeout is None:
-            return False
-        return (time.time() - proc[0]) >= self.timeout
-
     def make_queue(self, maxsize=0):
         return mp.Queue(maxsize)
+
+    def _kill(self, proc):
+        return proc.terminate()
+
+    def _join(self, proc):
+        return proc.join()
+
+    def _is_alive(self, proc):
+        return proc.is_alive()
 
 class GreenletFarm(TaskFarm):
     """
@@ -170,6 +172,9 @@ class GreenletFarm(TaskFarm):
 
         return proc
 
+    def make_queue(self, maxsize=0):
+        return gq.Queue(maxsize)
+
     def _kill(self, proc):
         return proc.kill()
 
@@ -179,9 +184,4 @@ class GreenletFarm(TaskFarm):
     def _is_alive(self, proc):
         return not bool(proc.ready())
 
-    def _has_timedout(self, proc):
-        return False
-
-    def make_queue(self, maxsize=0):
-        return gq.Queue(maxsize)
 
