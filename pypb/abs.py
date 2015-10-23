@@ -9,8 +9,9 @@ class Close(object):
     """
     Runs close() on context exiting and garbage collection.
 
-    If close() method should be run only once make sure to use the `runonce`
-    decorator. This class doesn't check if close has previously been run.
+    If close() method should be run only once
+    make sure to use the `runonce` decorator.
+    This class doesn't check if close has previously been run.
     """
 
     __metaclass__ = abc.ABCMeta
@@ -26,11 +27,7 @@ class Close(object):
 
     @abc.abstractmethod
     def close(self):
-        """
-        To be overridden in the subclass.
-        """
-
-        return
+        pass
 
 def runonce(origfn):
     """
