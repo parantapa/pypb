@@ -32,3 +32,4 @@ def timelimit(seconds):
         yield
     finally:
         signal.alarm(0)
+        signal.signal(signal.SIGALRM, signal.SIG_DFL)

@@ -18,7 +18,7 @@ from tempfile import NamedTemporaryFile as ntf
 import gzip
 import codecs
 
-TMP_SUFFIX = ".astore-tmp"
+TMP_SUFFIX = ".awriter_tmp"
 
 @contextmanager
 def awriter(func, name, mode="rb", *args, **kwargs):

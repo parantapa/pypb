@@ -20,10 +20,17 @@ from pypb.pstat import print_stats
 # Constants
 LOGTIMEFMT = "%Y-%m-%dT%H:%M:%S."
 
-def daemonize(prefix=None, logdir="~"):
+def daemonize(prefix=None, logdir="~/pypb_dmnlog"):
     """
     Daemonize the process.
     """
+
+    logdir = abspath(logdir)
+
+    # Create the directory if not exists
+    if not os.path.exists(logdir):
+        print "Folder '{}' doesn't exist. Creating ...".format(logdir)
+        os.makedirs(logdir)
 
     # Default prefix is script name - the py prefix
     if prefix is None:
@@ -43,12 +50,6 @@ def daemonize(prefix=None, logdir="~"):
     dc.working_directory = "."
     dc.umask = 0o022
     dc.signal_map = dict.fromkeys(STD_EXIT_SIGNALS, exit_signal)
-
-    # Create the directory if not exists
-    logdir = abspath(logdir)
-    if not os.path.exists(logdir):
-        print "Folder '{}' doesn't exist. Creating ...".format(logdir)
-        os.makedirs(logdir)
 
     # Do the redirection
     fobj = tempfile.NamedTemporaryFile(dir=logdir, delete=False,

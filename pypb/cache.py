@@ -45,7 +45,7 @@ def fnhash(fn):
 
     return source
 
-def diskcache(cachedir="~/.cache/pypb_diskcache"):
+def diskcache(cachedir="~/pypb_fncache"):
     """
     Return a function which memoizes the result of the original function.
     """

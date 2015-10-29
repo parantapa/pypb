@@ -3,7 +3,6 @@ Logbook notifier using notify-send.
 """
 
 from subprocess import call
-from pipes import quote as shell_quote
 
 from logbook.base import NOTSET, ERROR, WARNING, NOTICE
 from logbook.handlers import Handler, LimitingHandlerMixin
@@ -18,14 +17,12 @@ def notify_send(summary, text, urgency="normal", expire_time=5):
 
     assert urgency in ("low", "normal", "critical")
 
-    summary = shell_quote(summary)
-    text = shell_quote(text)
-    expire_time = int(expire_time) * 1000
-
-    cmd = "notify-send -u {} -t {} {} {}"
-    cmd = cmd.format(urgency, expire_time, summary, text)
-
-    call(cmd, shell=True)
+    cmd = ["notify-send",
+           "-u", urgency,
+           "-t", str(int(expire_time) * 1000),
+           summary,
+           text]
+    call(cmd)
 
 class NotifySendHandler(Handler, LimitingHandlerMixin):
     """
@@ -33,7 +30,7 @@ class NotifySendHandler(Handler, LimitingHandlerMixin):
     """
 
     def __init__(self, record_limit=None, record_delta=None,
-            level=NOTSET, filter=None, bubble=False):
+                 level=NOTSET, filter=None, bubble=False):
 
         Handler.__init__(self, level, filter, bubble)
         LimitingHandlerMixin.__init__(self, record_limit, record_delta)
