@@ -37,6 +37,8 @@ class TaskFarm(pypb.abs.Close):
 
         if procs is None:
             procs = set(self.procs)
+        else:
+            procs = set(procs)
 
         count_joined = 0
         while procs:
