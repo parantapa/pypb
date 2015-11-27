@@ -53,7 +53,6 @@ def speedup(con,
     """
 
     con.execute("pragma synchronous = off")
-    con.execute("pragma cache_size = -%d" % cache_size)
     con.execute("pragma secure_delete = off")
 
     if no_journal:
@@ -61,3 +60,5 @@ def speedup(con,
 
     if set_page_size:
         con.execute("pragma page_size = 65536")
+
+    con.execute("pragma cache_size = -%d" % cache_size)
