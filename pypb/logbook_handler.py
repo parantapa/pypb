@@ -94,7 +94,7 @@ class LockedFileHandler(Handler, StringFormatterHandlerMixin):
 
         with flock.flock(self.lock_filename):
             with codecs.open(self.filename, mode="ab", encoding="utf-8") as fobj:
-                message = self.format(record)
+                message = self.format(record) + "\n"
                 fobj.write(message)
 
                 fobj.flush()
@@ -107,7 +107,7 @@ class LockedFileHandler(Handler, StringFormatterHandlerMixin):
         with flock.flock(self.lock_filename):
             with codecs.open(self.filename, mode="ab", encoding="utf-8") as fobj:
                 for record in records:
-                    message = self.format(record)
+                    message = self.format(record) + "\n"
                     fobj.write(message)
 
                 fobj.flush()
