@@ -6,7 +6,7 @@ http://stackoverflow.com/questions/2333872/atomic-writing-to-file-with-python
 
 NOTE: Wont work on Non-POSIX systems
 NOTE: Wont work with Python3
-NOTE: Only supports read and write (not append or r+ or w+ modes)
+NOTE: Only supports write (not append or r+ or w+ modes)
 """
 
 import __builtin__
@@ -21,18 +21,14 @@ import codecs
 TMP_SUFFIX = ".awriter_tmp"
 
 @contextmanager
-def awriter(func, name, mode="rb", *args, **kwargs):
+def atomic_writer(func, name, mode="wb", *args, **kwargs):
     """
     Make sure the data is written atomically.
     """
 
     # Xor of the two conditions
-    assert ("w" in mode) != ("r" in mode)
-
-    # In read mode we have to do nothing
-    if "r" in mode:
-        yield func(name, mode, *args, **kwargs)
-        return
+    if "w" not in mode:
+        raise ValueError("Write mode not selected: mode = '%s'" % mode)
 
     # Get the filename parts
     fname = os.path.abspath(name)
@@ -54,24 +50,24 @@ def awriter(func, name, mode="rb", *args, **kwargs):
     # Now the atomic switch
     os.rename(tname, fname)
 
-def open(*args, **kwargs):
+def open(*args, **kwargs): # pylint: disable=redefined-builtin
     """
     Atomic context manager for open.
     """
 
-    return awriter(__builtin__.open, *args, **kwargs)
+    return atomic_writer(__builtin__.open, *args, **kwargs)
 
 def gopen(*args, **kwargs):
     """
     Atomic context manager for gzip.open
     """
 
-    return awriter(gzip.open, *args, **kwargs)
+    return atomic_writer(gzip.open, *args, **kwargs)
 
 def copen(*args, **kwargs):
     """
     Atomic context mangager for codecs.open
     """
 
-    return awriter(codecs.open, *args, **kwargs)
+    return atomic_writer(codecs.open, *args, **kwargs)
 
