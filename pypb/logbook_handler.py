@@ -2,6 +2,7 @@
 Logbook handlers using for sqlite3 logging and notify-send.
 """
 
+import codecs
 from subprocess import call
 
 from logbook.base import NOTSET, ERROR, WARNING, NOTICE
@@ -84,29 +85,32 @@ class LockedFileHandler(Handler, StringFormatterHandlerMixin):
         StringFormatterHandlerMixin.__init__(self, format_string)
 
         self.filename = filename
+        self.lock_filename = filename + ".lock"
 
     def emit(self, record):
         """
         Log the record.
         """
 
-        with flock.copen(self.filename, mode="ab", encoding="utf-8") as fobj:
-            message = self.format(record)
-            fobj.write(message)
+        with flock.flock(self.lock_filename):
+            with codecs.open(self.filename, mode="ab", encoding="utf-8") as fobj:
+                message = self.format(record)
+                fobj.write(message)
 
-            fobj.flush()
+                fobj.flush()
 
     def emit_batch(self, records, reason):
         """
         Log multiple records.
         """
 
-        with flock.copen(self.filename, mode="ab", encoding="utf-8") as fobj:
-            for record in records:
-                message = self.format(record)
-                fobj.write(message)
+        with flock.flock(self.lock_filename):
+            with codecs.open(self.filename, mode="ab", encoding="utf-8") as fobj:
+                for record in records:
+                    message = self.format(record)
+                    fobj.write(message)
 
-            fobj.flush()
+                fobj.flush()
 
 def main():
     import logbook
