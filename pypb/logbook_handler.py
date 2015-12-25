@@ -78,7 +78,7 @@ class LockedFileHandler(Handler, StringFormatterHandlerMixin):
     Log to a file.
     """
 
-    def __init__(self, filename, format_string,
+    def __init__(self, filename, format_string=None,
                  level=NOTSET, filter=None, bubble=False):
 
         Handler.__init__(self, level, filter, bubble)
