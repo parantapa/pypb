@@ -2,14 +2,14 @@
 Logbook handlers using for sqlite3 logging and notify-send.
 """
 
-import time
-import sqlite3
 from subprocess import call
 
 from logbook.base import NOTSET, ERROR, WARNING, NOTICE
 from logbook.handlers import Handler, \
                              LimitingHandlerMixin, \
                              StringFormatterHandlerMixin
+
+import pypb.flock as flock
 
 EXPIRES_NEVER = 0
 EXPIRES_DEFAULT = 5
@@ -72,9 +72,9 @@ class NotifySendHandler(Handler, StringFormatterHandlerMixin,
 
         notify_send(summary, text, urgency, expire_time)
 
-class SqliteHandler(Handler, StringFormatterHandlerMixin):
+class LockedFileHandler(Handler, StringFormatterHandlerMixin):
     """
-    Log to a sqlite3 file.
+    Log to a file.
     """
 
     def __init__(self, filename, format_string,
@@ -83,32 +83,30 @@ class SqliteHandler(Handler, StringFormatterHandlerMixin):
         Handler.__init__(self, level, filter, bubble)
         StringFormatterHandlerMixin.__init__(self, format_string)
 
-        self.con = sqlite3.connect(filename)
-
-        sql = "pragma page_size = 16384"
-        self.con.execute(sql)
-        sql = "pragma journal_mode = wal"
-        self.con.execute(sql)
-        sql = """
-            create table if not exists log (
-                channel text,
-                logged_at bigint,
-                message text)
-            """
-        self.con.execute(sql)
+        self.filename = filename
 
     def emit(self, record):
         """
         Log the record.
         """
 
-        sql = "insert into log (?,?,?)"
-        channel = record.channel
-        logged_at = time.mktime(record.time.timetuple())
-        message = self.format(record)
+        with flock.copen(self.filename, mode="ab", encoding="utf-8") as fobj:
+            message = self.format(record)
+            fobj.write(message)
 
-        with self.con:
-            self.con.execute(sql, (channel, logged_at, message))
+            fobj.flush()
+
+    def emit_batch(self, records, reason):
+        """
+        Log multiple records.
+        """
+
+        with flock.copen(self.filename, mode="ab", encoding="utf-8") as fobj:
+            for record in records:
+                message = self.format(record)
+                fobj.write(message)
+
+            fobj.flush()
 
 def main():
     import logbook
