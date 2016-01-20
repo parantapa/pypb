@@ -24,7 +24,7 @@ def flock(fname, lock_type="exclusive", blocking=True):
     if not blocking:
         operation = operation | fcntl.LOCK_NB
 
-    with open(fname, "wb") as fobj:
+    with open(fname, "ab") as fobj:
         fd = fobj.fileno()
         fcntl.lockf(fd, operation)
 
