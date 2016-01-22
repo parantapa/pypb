@@ -2,4 +2,6 @@ logbook
 python-daemon
 gevent
 setproctitle
+msgpack-python
 # pyzmq
+# py.test
