@@ -17,8 +17,6 @@ Data format:
                 "index_size": <size of the index block>,
                 "serializer": "msgpack",
                 "compression": "zlib",
-                "compression_level": 6,
-                "checksum_type": "adler32",
                 "block_length": <number of items per block>,
                 "length": <number of items in the dataset>.
             }
@@ -62,6 +60,11 @@ DECOMPRESSER_TABLE = {
     "lz4": lz4.decompress,
 }
 
+def checksum(data):
+    chksum = zlib.adler32(data) & 0xffffffff
+    chksum = struct.pack("<I", chksum)
+    return chksum
+
 class DatasetReader(Sequence, pypb.abs.Close):
     """
     Reads a dataset object from a file.
@@ -83,8 +86,7 @@ class DatasetReader(Sequence, pypb.abs.Close):
         # Read the header
         header_raw = self.fobj.read(hdr_size)
         header_chksum = self.fobj.read(CHECKSUM_LEN)
-        header_chksum = struct.unpack("<I", header_chksum)[0]
-        if zlib.adler32(header_raw) & 0xffffffff != header_chksum:
+        if checksum(header_raw) != header_chksum:
             raise IOError("Header checksum mismatch")
         header = msgpack.unpackb(header_raw, encoding="utf-8")
 
@@ -102,8 +104,7 @@ class DatasetReader(Sequence, pypb.abs.Close):
         self.fobj.seek(self.index_start)
         index_raw = self.fobj.read(self.index_size)
         index_chksum = self.fobj.read(CHECKSUM_LEN)
-        index_chksum = struct.unpack("<I", index_chksum)[0]
-        if zlib.adler32(index_raw) & 0xffffffff != index_chksum:
+        if checksum(index_raw) != index_chksum:
             raise IOError("Index checksum mismatch")
         index_raw = self.decompress(index_raw)
         self.index = msgpack.unpackb(index_raw, encoding="utf-8")
@@ -129,8 +130,7 @@ class DatasetReader(Sequence, pypb.abs.Close):
         self.fobj.seek(block_start)
         block_raw = self.fobj.read(block_size)
         block_chksum = self.fobj.read(CHECKSUM_LEN)
-        block_chksum = struct.unpack("<I", block_chksum)[0]
-        if zlib.adler32(block_raw) & 0xffffffff != block_chksum:
+        if checksum(block_raw) != block_chksum:
             raise IOError("Block %d checksum mismatch" % n)
 
         block_raw = self.decompress(block_raw)
@@ -273,8 +273,7 @@ class DatasetWriter(pypb.abs.Close):
         block_start = self.fobj.tell()
         block_raw = msgpack.packb(self.cur_block, use_bin_type=True)
         block_raw = self.compress(block_raw)
-        block_chksum = zlib.adler32(block_raw) & 0xffffffff
-        block_chksum = struct.pack("<I", block_chksum)
+        block_chksum = checksum(block_raw)
 
         self.index.append((block_start, len(block_raw)))
 
@@ -294,8 +293,7 @@ class DatasetWriter(pypb.abs.Close):
         index_start = self.fobj.tell()
         index_raw = msgpack.packb(self.index, use_bin_type=True)
         index_raw = self.compress(index_raw)
-        index_chksum = zlib.adler32(index_raw) & 0xffffffff
-        index_chksum = struct.pack("<I", index_chksum)
+        index_chksum = checksum(index_raw)
 
         self.fobj.write(index_raw)
         self.fobj.write(index_chksum)
@@ -312,13 +310,11 @@ class DatasetWriter(pypb.abs.Close):
             "index_size": index_size,
             "serializer": "msgpack",
             "compression": self.compression,
-            "checksum_type": "adler32",
             "block_length": self.block_length,
             "length": self.length
         }
         header_raw = msgpack.packb(header, use_bin_type=True)
-        header_chksum = zlib.adler32(header_raw) & 0xffffffff
-        header_chksum = struct.pack("<I", header_chksum)
+        header_chksum = checksum(header_raw)
 
         magic = MAGIC_STRING
         version = VERSION
