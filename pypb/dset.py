@@ -1,4 +1,5 @@
 # encoding: utf-8
+# pylint: disable=too-many-instance-attributes
 """
 Read and write PB's Dataset files.
 
@@ -41,6 +42,7 @@ import struct
 from collections import defaultdict, Sequence
 
 import msgpack
+import lz4
 
 import pypb.abs
 
@@ -48,10 +50,19 @@ MAGIC_STRING = "pb's dataset"
 HEADER_SPACE = 4096
 PRE_HEADER_FMT = "< 12s H L"
 CHECKSUM_LEN = 4
-COMPRESS_LEVEL = 6
 VERSION = 1
 
-class DatasetReader(Sequence, pypb.abs.Close): # pylint: disable=too-many-instance-attributes
+COMPRESSER_TABLE = {
+    "zlib": zlib.compress,
+    "lz4": lz4.compress,
+}
+
+DECOMPRESSER_TABLE = {
+    "zlib": zlib.decompress,
+    "lz4": lz4.decompress,
+}
+
+class DatasetReader(Sequence, pypb.abs.Close):
     """
     Reads a dataset object from a file.
     """
@@ -83,6 +94,10 @@ class DatasetReader(Sequence, pypb.abs.Close): # pylint: disable=too-many-instan
         self.block_length = header["block_length"]
         self.length = header["length"]
 
+        if header["compression"] not in DECOMPRESSER_TABLE:
+            raise IOError("Unknown compression '%s'" % header["compression"])
+        self.decompress = DECOMPRESSER_TABLE[header["compression"]]
+
         # Read the index
         self.fobj.seek(self.index_start)
         index_raw = self.fobj.read(self.index_size)
@@ -90,7 +105,7 @@ class DatasetReader(Sequence, pypb.abs.Close): # pylint: disable=too-many-instan
         index_chksum = struct.unpack("<I", index_chksum)[0]
         if zlib.adler32(index_raw) & 0xffffffff != index_chksum:
             raise IOError("Index checksum mismatch")
-        index_raw = zlib.decompress(index_raw)
+        index_raw = self.decompress(index_raw)
         self.index = msgpack.unpackb(index_raw, encoding="utf-8")
 
         # NOTE: Only used by get_idx
@@ -118,7 +133,7 @@ class DatasetReader(Sequence, pypb.abs.Close): # pylint: disable=too-many-instan
         if zlib.adler32(block_raw) & 0xffffffff != block_chksum:
             raise IOError("Block %d checksum mismatch" % n)
 
-        block_raw = zlib.decompress(block_raw)
+        block_raw = self.decompress(block_raw)
         return msgpack.unpackb(block_raw, encoding="utf-8")
 
     def get_idx(self, n):
@@ -216,7 +231,7 @@ class DatasetWriter(pypb.abs.Close):
     Writes a dataset object to a file.
     """
 
-    def __init__(self, fname, block_length):
+    def __init__(self, fname, block_length, compression="lz4"):
         self.fname = fname
         self.fobj = open(fname, "wb")
 
@@ -224,6 +239,11 @@ class DatasetWriter(pypb.abs.Close):
         if block_length < 1:
             raise ValueError("Block length must be at-least 1")
         self.block_length = block_length
+
+        if compression not in COMPRESSER_TABLE:
+            raise ValueError("Unknown compression '%s'" % compression)
+        self.compression = compression
+        self.compress = COMPRESSER_TABLE[compression]
 
         self.length = 0
         self.cur_block = []
@@ -252,7 +272,7 @@ class DatasetWriter(pypb.abs.Close):
 
         block_start = self.fobj.tell()
         block_raw = msgpack.packb(self.cur_block, use_bin_type=True)
-        block_raw = zlib.compress(block_raw, COMPRESS_LEVEL)
+        block_raw = self.compress(block_raw)
         block_chksum = zlib.adler32(block_raw) & 0xffffffff
         block_chksum = struct.pack("<I", block_chksum)
 
@@ -273,7 +293,7 @@ class DatasetWriter(pypb.abs.Close):
 
         index_start = self.fobj.tell()
         index_raw = msgpack.packb(self.index, use_bin_type=True)
-        index_raw = zlib.compress(index_raw, COMPRESS_LEVEL)
+        index_raw = self.compress(index_raw)
         index_chksum = zlib.adler32(index_raw) & 0xffffffff
         index_chksum = struct.pack("<I", index_chksum)
 
@@ -291,8 +311,7 @@ class DatasetWriter(pypb.abs.Close):
             "index_start": index_start,
             "index_size": index_size,
             "serializer": "msgpack",
-            "compression": "zlib",
-            "compression_level": COMPRESS_LEVEL,
+            "compression": self.compression,
             "checksum_type": "adler32",
             "block_length": self.block_length,
             "length": self.length

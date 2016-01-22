@@ -3,5 +3,6 @@ python-daemon
 gevent
 setproctitle
 msgpack-python
+lz4
 # pyzmq
 # py.test
