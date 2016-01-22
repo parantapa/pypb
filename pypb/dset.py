@@ -126,11 +126,14 @@ class DatasetReader(Sequence, pypb.abs.Close): # pylint: disable=too-many-instan
         Get the value at given idx.
         """
 
+        _block_length = self.block_length
+
         n = (self.length + n) if n < 0 else n
         if n < 0 or n >= self.length:
             raise IndexError("Index out of range")
 
-        i, j = divmod(n, self.block_length)
+        i = n // _block_length
+        j = n % _block_length
         if self.cur_block_idx != i:
             self.cur_block = self._load_block(i)
             self.cur_block_idx = i
@@ -140,6 +143,8 @@ class DatasetReader(Sequence, pypb.abs.Close): # pylint: disable=too-many-instan
         """
         Return iterable for the given range.
         """
+
+        _block_length = self.block_length
 
         start, stop, step = slice(*args).indices(self.length)
 
@@ -160,7 +165,8 @@ class DatasetReader(Sequence, pypb.abs.Close): # pylint: disable=too-many-instan
         cur_block_idx = -1
         cur_block = None
         for n in xrange(start, stop, step):
-            i, j = divmod(n, self.block_length)
+            i = n // _block_length
+            j = n % _block_length
             if cur_block_idx != i:
                 cur_block = self._load_block(i)
                 cur_block_idx = i
@@ -171,6 +177,8 @@ class DatasetReader(Sequence, pypb.abs.Close): # pylint: disable=too-many-instan
         Get the values at given idxs.
         """
 
+        _block_length = self.block_length
+
         if not all(ns[i] < ns[i+1] for i in xrange(len(ns) -1)):
             raise ValueError("Indexes must be sorted and be unique")
 
@@ -180,7 +188,8 @@ class DatasetReader(Sequence, pypb.abs.Close): # pylint: disable=too-many-instan
             if n < 0 or n >= self.length:
                 raise IndexError("Index out of range")
 
-            i, j = divmod(n, self.block_length)
+            i = n // _block_length
+            j = n % _block_length
             i_js[i].append(j)
 
         for i in sorted(i_js):
