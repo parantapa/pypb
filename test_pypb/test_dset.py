@@ -140,8 +140,9 @@ def test_get_slice_wstep(tmpdir, test_data, block_length):
                 stop, start = start, stop
 
             # With half probability do negative indexes
-            stop = stop - len(test_data)
-            start = start - len(test_data)
+            if random.random() < 0.5:
+                stop = stop - len(test_data)
+                start = start - len(test_data)
 
             stop = stop + step
 
