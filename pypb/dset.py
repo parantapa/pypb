@@ -35,6 +35,7 @@ Data format:
     Index checksum: 4 bytes
 """
 
+import __builtin__
 import zlib
 import struct
 from collections import defaultdict, Sequence
@@ -72,7 +73,7 @@ class DatasetReader(Sequence, pypb.abs.Close):
 
     def __init__(self, fname):
         self.fname = fname
-        self.fobj = open(fname, "rb")
+        self.fobj = __builtin__.open(fname, "rb")
 
         # Read the preheader
         pre_header = self.fobj.read(struct.calcsize(PRE_HEADER_FMT))
@@ -233,7 +234,7 @@ class DatasetWriter(pypb.abs.Close):
 
     def __init__(self, fname, block_length, compression="lz4"):
         self.fname = fname
-        self.fobj = open(fname, "wb")
+        self.fobj = __builtin__.open(fname, "wb")
 
         block_length = int(block_length)
         if block_length < 1:
@@ -343,6 +344,20 @@ class DatasetWriter(pypb.abs.Close):
             self.length += 1
             if len(self.cur_block) == self.block_length:
                 self._flush()
+
+def open(fname, mode="r", block_length=None, compression="lz4"): # pylint: disable=redefined-builtin
+    """
+    Open a dataset for reading or writing.
+    """
+
+    if mode == "r":
+        return DatasetReader(fname)
+    elif mode == "w":
+        if block_length is None:
+            raise ValueError("Must specify block_length for write mode")
+        return DatasetWriter(fname, block_length, compression)
+    else:
+        raise ValueError("Invalid mode '%s'" % mode)
 
 def main():
     import sys
