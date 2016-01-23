@@ -38,7 +38,7 @@ Data format:
 import __builtin__
 import zlib
 import struct
-from collections import defaultdict, Sequence
+from collections import Sequence
 
 import msgpack
 import lz4
@@ -191,14 +191,14 @@ class DatasetReader(Sequence, pypb.abs.Close):
     def get_idxs(self, ns):
         """
         Get the values at given idxs.
+
+        NOTE: if the indexes are not sorted, performance may be really slow.
         """
 
         _block_length = self.block_length
 
-        if not all(ns[i] < ns[i+1] for i in xrange(len(ns) -1)):
-            raise ValueError("Indexes must be sorted and be unique")
-
-        i_js = defaultdict(list)
+        cur_block_idx = -1
+        cur_block = None
         for n in ns:
             n = (self.length + n) if n < 0 else n
             if n < 0 or n >= self.length:
@@ -206,12 +206,10 @@ class DatasetReader(Sequence, pypb.abs.Close):
 
             i = n // _block_length
             j = n % _block_length
-            i_js[i].append(j)
-
-        for i in sorted(i_js):
-            cur_block = self._load_block(i)
-            for j in i_js[i]:
-                yield cur_block[j]
+            if cur_block_idx != i:
+                cur_block = self._load_block(i)
+                cur_block_idx = i
+            yield cur_block[j]
 
     def __iter__(self):
         return self.get_slice(self.length)
