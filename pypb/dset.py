@@ -212,7 +212,10 @@ class DatasetReader(Sequence, pypb.abs.Close):
             yield cur_block[j]
 
     def __iter__(self):
-        return self.get_slice(self.length)
+        for i in xrange(len(self.index)):
+            cur_block = self._load_block(i)
+            for item in cur_block:
+                yield item
 
     def __len__(self):
         return self.length
