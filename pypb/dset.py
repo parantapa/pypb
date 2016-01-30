@@ -66,6 +66,30 @@ def checksum(data):
     chksum = struct.pack("<I", chksum)
     return chksum
 
+def _read_header(fobj):
+    """
+    Check and read file header.
+    """
+
+    fobj.seek(0)
+
+    # Read the preheader
+    pre_header = fobj.read(struct.calcsize(PRE_HEADER_FMT))
+    magic, version, hdr_size = struct.unpack(PRE_HEADER_FMT, pre_header)
+    if magic != MAGIC_STRING:
+        raise IOError("Not a dataset file")
+    if version < 1 or version > VERSION:
+        raise IOError("Invalid version %d" % version)
+
+    # Read the header
+    header_raw = fobj.read(hdr_size)
+    header_chksum = fobj.read(CHECKSUM_LEN)
+    if checksum(header_raw) != header_chksum:
+        raise IOError("Header checksum mismatch")
+    header = msgpack.unpackb(header_raw, encoding="utf-8")
+
+    return version, header
+
 class DatasetReader(Sequence, pypb.abs.Close):
     """
     Reads a dataset object from a file.
@@ -75,35 +99,17 @@ class DatasetReader(Sequence, pypb.abs.Close):
         self.fname = fname
         self.fobj = __builtin__.open(fname, "rb")
 
-        # Read the preheader
-        pre_header = self.fobj.read(struct.calcsize(PRE_HEADER_FMT))
-        magic, version, hdr_size = struct.unpack(PRE_HEADER_FMT, pre_header)
-        if magic != MAGIC_STRING:
-            raise IOError("Not a dataset file")
-        if version < 1 or version > VERSION:
-            raise IOError("Invalid version %d" % version)
-        self.version = version
+        self.version, self.header = _read_header(self.fobj)
+        self.block_length = self.header["block_length"]
+        self.length = self.header["length"]
 
-        # Read the header
-        header_raw = self.fobj.read(hdr_size)
-        header_chksum = self.fobj.read(CHECKSUM_LEN)
-        if checksum(header_raw) != header_chksum:
-            raise IOError("Header checksum mismatch")
-        header = msgpack.unpackb(header_raw, encoding="utf-8")
-
-        self.header = header
-        self.index_start = header["index_start"]
-        self.index_size = header["index_size"]
-        self.block_length = header["block_length"]
-        self.length = header["length"]
-
-        if header["compression"] not in DECOMPRESSER_TABLE:
-            raise IOError("Unknown compression '%s'" % header["compression"])
-        self.decompress = DECOMPRESSER_TABLE[header["compression"]]
+        if self.header["compression"] not in DECOMPRESSER_TABLE:
+            raise IOError("Unknown compression '%s'" % self.header["compression"])
+        self.decompress = DECOMPRESSER_TABLE[self.header["compression"]]
 
         # Read the index
-        self.fobj.seek(self.index_start)
-        index_raw = self.fobj.read(self.index_size)
+        self.fobj.seek(self.header["index_start"])
+        index_raw = self.fobj.read(self.header["index_size"])
         index_chksum = self.fobj.read(CHECKSUM_LEN)
         if checksum(index_raw) != index_chksum:
             raise IOError("Index checksum mismatch")
