@@ -18,7 +18,7 @@ def test_data(request):
 def block_length(request):
     return request.param
 
-def test_simple(tmpdir, test_data, block_length):
+def test_append(tmpdir, test_data, block_length):
     """
     Test the iterator version.
     """
@@ -32,7 +32,7 @@ def test_simple(tmpdir, test_data, block_length):
     with pypb.dset.open(fname) as dset:
         assert test_data == list(dset)
 
-def test_iter(tmpdir, test_data, block_length):
+def test_extend(tmpdir, test_data, block_length):
     """
     Test the iterator version.
     """
@@ -44,6 +44,79 @@ def test_iter(tmpdir, test_data, block_length):
 
     with pypb.dset.open(fname) as dset:
         assert test_data == list(dset)
+
+def test_append_mode_2parts(tmpdir, test_data, block_length):
+    """
+    Test the append mode usage.
+    """
+
+    fname = tmpdir.join("test.dset").strpath
+
+    random.seed(42)
+    for _ in xrange(10):
+        n = random.randint(0, len(test_data) - 1)
+
+        # Randomly split input data into two parts
+        part1 = test_data[:n]
+        part2 = test_data[n:]
+
+        # Insert into dset separately
+        with pypb.dset.open(fname, "w", block_length) as dset:
+            dset.extend(part1)
+
+        # Second time open in append mode
+        with pypb.dset.open(fname, "a") as dset:
+            dset.extend(part2)
+
+        with pypb.dset.open(fname) as dset:
+            assert test_data == list(dset)
+
+def test_empty_read_raises(tmpdir):
+    """
+    Test raise on empty file raises.
+    """
+
+    fname = tmpdir.join("test.dset").strpath
+
+    with pytest.raises(IOError):
+        with pypb.dset.open(fname):
+            pass
+
+    with pytest.raises(IOError):
+        with pypb.dset.open(fname, "a"):
+            pass
+
+def test_append_mode_3parts(tmpdir, test_data, block_length):
+    """
+    Test the append mode usage.
+    """
+
+    fname = tmpdir.join("test.dset").strpath
+
+    random.seed(42)
+    for _ in xrange(10):
+        n1 = random.randint(0, len(test_data) - 1)
+        n2 = random.randint(n1, len(test_data) - 1)
+
+        # Randomly split input data into two parts
+        part1 = test_data[:n1]
+        part2 = test_data[n1:n2]
+        part3 = test_data[n2:]
+
+        # Insert into dset separately
+        with pypb.dset.open(fname, "w", block_length) as dset:
+            dset.extend(part1)
+
+        # Second time open in append mode
+        with pypb.dset.open(fname, "a") as dset:
+            dset.extend(part2)
+
+        # Second time open in append mode
+        with pypb.dset.open(fname, "a") as dset:
+            dset.extend(part3)
+
+        with pypb.dset.open(fname) as dset:
+            assert test_data == list(dset)
 
 def test_get_idx(tmpdir, test_data, block_length):
     """

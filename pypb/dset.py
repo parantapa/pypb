@@ -128,6 +128,7 @@ class DatasetReader(Sequence, pypb.abs.Close):
 
     def __init__(self, fname):
         self.fname = fname
+        self.fobj = None
         self.fobj = __builtin__.open(fname, "rb")
 
         version, header, decompress, index = read_meta(self.fobj)
@@ -146,7 +147,8 @@ class DatasetReader(Sequence, pypb.abs.Close):
 
     @pypb.abs.runonce
     def close(self):
-        self.fobj.close()
+        if self.fobj is not None:
+            self.fobj.close()
 
     def get_idx(self, n):
         """
@@ -246,19 +248,20 @@ class DatasetWriter(pypb.abs.Close):
 
     def __init__(self, fname, block_length, compression="lz4"):
         self.fname = fname
+        self.fobj = None
         self.fobj = __builtin__.open(fname, "wb")
 
         block_length = int(block_length)
         if block_length < 1:
             raise ValueError("Block length must be at-least 1")
         self.block_length = block_length
+        self.length = 0
 
         if compression not in COMPRESSER_TABLE:
             raise ValueError("Unknown compression '%s'" % compression)
         self.compression = compression
         self.compress = COMPRESSER_TABLE[compression]
 
-        self.length = 0
         self.cur_block = []
         self.cur_block_idx = 0
 
@@ -266,10 +269,11 @@ class DatasetWriter(pypb.abs.Close):
 
     @pypb.abs.runonce
     def close(self):
-        self._flush(force=True)
-        index_start, index_size = self._write_index()
-        self._write_header(index_start, index_size)
-        self.fobj.close()
+        if self.fobj is not None:
+            self._flush(force=True)
+            index_start, index_size = self._write_index()
+            self._write_header(index_start, index_size)
+            self.fobj.close()
 
     def _flush(self, force=False):
         """
@@ -357,6 +361,37 @@ class DatasetWriter(pypb.abs.Close):
             if len(self.cur_block) == self.block_length:
                 self._flush()
 
+class DatasetAppender(DatasetWriter):
+    """
+    Appends to a dataset file.
+    """
+
+    def __init__(self, fname): # pylint: disable=super-init-not-called
+        self.fname = fname
+        self.fobj = None
+        self.fobj = __builtin__.open(fname, "r+b")
+
+        _, header, decompress, index = read_meta(self.fobj)
+
+        self.block_length = header["block_length"]
+        self.length = header["length"]
+
+        if header["compression"] not in COMPRESSER_TABLE:
+            raise ValueError("Unknown compression '%s'" % header["compression"])
+        self.compression = header["compression"]
+        self.compress = COMPRESSER_TABLE[header["compression"]]
+
+        if len(index) > 0:
+            self.cur_block_idx = len(index) - 1
+            self.cur_block = load_block(self.fobj, index, self.cur_block_idx, decompress)
+            index.pop()
+
+            self.index = index
+        else:
+            self.cur_block_idx = 0
+            self.cur_block = []
+            self.index = []
+
 def open(fname, mode="r", block_length=None, compression="lz4"): # pylint: disable=redefined-builtin
     """
     Open a dataset for reading or writing.
@@ -368,6 +403,8 @@ def open(fname, mode="r", block_length=None, compression="lz4"): # pylint: disab
         if block_length is None:
             raise ValueError("Must specify block_length for write mode")
         return DatasetWriter(fname, block_length, compression)
+    elif mode == "a":
+        return DatasetAppender(fname)
     else:
         raise ValueError("Invalid mode '%s'" % mode)
 
