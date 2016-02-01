@@ -8,7 +8,7 @@ import random
 
 import pytest
 
-from pypb.dset import DatasetReader, DatasetWriter
+import pypb.dset
 
 @pytest.fixture(params=[1000, 1001, 10000, 10001])
 def test_data(request):
@@ -25,11 +25,11 @@ def test_simple(tmpdir, test_data, block_length):
 
     fname = tmpdir.join("test.dset").strpath
 
-    with DatasetWriter(fname, block_length) as dset:
+    with pypb.dset.open(fname, "w", block_length) as dset:
         for item in test_data:
             dset.append(item)
 
-    with DatasetReader(fname) as dset:
+    with pypb.dset.open(fname) as dset:
         assert test_data == list(dset)
 
 def test_iter(tmpdir, test_data, block_length):
@@ -39,10 +39,10 @@ def test_iter(tmpdir, test_data, block_length):
 
     fname = tmpdir.join("test.dset").strpath
 
-    with DatasetWriter(fname, block_length) as dset:
+    with pypb.dset.open(fname, "w", block_length) as dset:
         dset.extend(test_data)
 
-    with DatasetReader(fname) as dset:
+    with pypb.dset.open(fname) as dset:
         assert test_data == list(dset)
 
 def test_get_idx(tmpdir, test_data, block_length):
@@ -52,10 +52,10 @@ def test_get_idx(tmpdir, test_data, block_length):
 
     fname = tmpdir.join("test.dset").strpath
 
-    with DatasetWriter(fname, block_length) as dset:
+    with pypb.dset.open(fname, "w", block_length) as dset:
         dset.extend(test_data)
 
-    with DatasetReader(fname) as dset:
+    with pypb.dset.open(fname) as dset:
         for i in xrange(len(test_data)):
             assert test_data[i] == dset.get_idx(i)
             assert test_data[i] == dset[i]
@@ -70,10 +70,10 @@ def test_get_idxs(tmpdir, test_data, block_length):
 
     fname = tmpdir.join("test.dset").strpath
 
-    with DatasetWriter(fname, block_length) as dset:
+    with pypb.dset.open(fname, "w", block_length) as dset:
         dset.extend(test_data)
 
-    with DatasetReader(fname) as dset:
+    with pypb.dset.open(fname) as dset:
         random.seed(42)
         all_idxs = range(len(test_data))
 
@@ -96,10 +96,10 @@ def test_get_slice(tmpdir, test_data, block_length):
 
     fname = tmpdir.join("test.dset").strpath
 
-    with DatasetWriter(fname, block_length) as dset:
+    with pypb.dset.open(fname, "w", block_length) as dset:
         dset.extend(test_data)
 
-    with DatasetReader(fname) as dset:
+    with pypb.dset.open(fname) as dset:
         random.seed(42)
         all_idxs = range(len(test_data))
 
@@ -120,10 +120,10 @@ def test_get_slice_wstep(tmpdir, test_data, block_length):
 
     fname = tmpdir.join("test.dset").strpath
 
-    with DatasetWriter(fname, block_length) as dset:
+    with pypb.dset.open(fname, "w", block_length) as dset:
         dset.extend(test_data)
 
-    with DatasetReader(fname) as dset:
+    with pypb.dset.open(fname) as dset:
         random.seed(42)
         all_idxs = range(len(test_data))
 
