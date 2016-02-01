@@ -267,6 +267,9 @@ class DatasetWriter(pypb.abs.Close):
 
         self.index = []
 
+        # Write the header region with garbage
+        self.fobj.write(chr(42) * HEADER_SPACE)
+
     @pypb.abs.runonce
     def close(self):
         if self.fobj is not None:
@@ -282,10 +285,6 @@ class DatasetWriter(pypb.abs.Close):
 
         if len(self.cur_block) != self.block_length and not force:
             raise ValueError("Cant flush unfilled block without forcing")
-
-        # Write the header region with garbage
-        if self.cur_block_idx == 0:
-            self.fobj.write(chr(42) * HEADER_SPACE)
 
         block_start = self.fobj.tell()
         block_raw = msgpack.packb(self.cur_block, use_bin_type=True)
@@ -384,6 +383,8 @@ class DatasetAppender(DatasetWriter):
         if len(index) > 0:
             self.cur_block_idx = len(index) - 1
             self.cur_block = load_block(self.fobj, index, self.cur_block_idx, decompress)
+
+            # Remove last entry from index
             index.pop()
 
             self.index = index
@@ -391,6 +392,13 @@ class DatasetAppender(DatasetWriter):
             self.cur_block_idx = 0
             self.cur_block = []
             self.index = []
+
+        # Move the file pointer to after the current index data.
+        # This will create holes in the file.
+        # But it reduces the chances of total loss in case of crash.
+        index_start = header["index_start"]
+        index_size = header["index_size"]
+        self.fobj.seek(index_start + index_size + CHECKSUM_LEN)
 
 def open(fname, mode="r", block_length=None, compression="lz4"): # pylint: disable=redefined-builtin
     """
