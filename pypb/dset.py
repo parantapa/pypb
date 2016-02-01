@@ -66,14 +66,13 @@ def checksum(data):
     chksum = struct.pack("<I", chksum)
     return chksum
 
-def _read_header(fobj):
+def read_meta(fobj):
     """
-    Check and read file header.
+    Read file header and index.
     """
-
-    fobj.seek(0)
 
     # Read the preheader
+    fobj.seek(0)
     pre_header = fobj.read(struct.calcsize(PRE_HEADER_FMT))
     magic, version, hdr_size = struct.unpack(PRE_HEADER_FMT, pre_header)
     if magic != MAGIC_STRING:
@@ -88,7 +87,21 @@ def _read_header(fobj):
         raise IOError("Header checksum mismatch")
     header = msgpack.unpackb(header_raw, encoding="utf-8")
 
-    return version, header
+    # Get the decompresser function
+    if header["compression"] not in DECOMPRESSER_TABLE:
+        raise IOError("Unknown compression '%s'" % header["compression"])
+    decompress = DECOMPRESSER_TABLE[header["compression"]]
+
+    # Read the index
+    fobj.seek(header["index_start"])
+    index_raw = fobj.read(header["index_size"])
+    index_chksum = fobj.read(CHECKSUM_LEN)
+    if checksum(index_raw) != index_chksum:
+        raise IOError("Index checksum mismatch")
+    index_raw = decompress(index_raw)
+    index = msgpack.unpackb(index_raw, encoding="utf-8")
+
+    return version, header, decompress, index
 
 class DatasetReader(Sequence, pypb.abs.Close):
     """
@@ -99,22 +112,14 @@ class DatasetReader(Sequence, pypb.abs.Close):
         self.fname = fname
         self.fobj = __builtin__.open(fname, "rb")
 
-        self.version, self.header = _read_header(self.fobj)
+        version, header, decompress, index = read_meta(self.fobj)
+
+        self.version = version
+        self.header = header
+        self.decompress = decompress
+        self.index = index
         self.block_length = self.header["block_length"]
         self.length = self.header["length"]
-
-        if self.header["compression"] not in DECOMPRESSER_TABLE:
-            raise IOError("Unknown compression '%s'" % self.header["compression"])
-        self.decompress = DECOMPRESSER_TABLE[self.header["compression"]]
-
-        # Read the index
-        self.fobj.seek(self.header["index_start"])
-        index_raw = self.fobj.read(self.header["index_size"])
-        index_chksum = self.fobj.read(CHECKSUM_LEN)
-        if checksum(index_raw) != index_chksum:
-            raise IOError("Index checksum mismatch")
-        index_raw = self.decompress(index_raw)
-        self.index = msgpack.unpackb(index_raw, encoding="utf-8")
 
         # NOTE: Only used by get_idx
         # get_idxs and get_slice use their own local block storage
