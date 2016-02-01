@@ -103,6 +103,24 @@ def read_meta(fobj):
 
     return version, header, decompress, index
 
+def load_block(fobj, index, n, decompress):
+    """
+    Load the n-th block into memory.
+    """
+
+    assert 0 <= n < len(index)
+
+    block_start, block_size = index[n]
+
+    fobj.seek(block_start)
+    block_raw = fobj.read(block_size)
+    block_chksum = fobj.read(CHECKSUM_LEN)
+    if checksum(block_raw) != block_chksum:
+        raise IOError("Block %d checksum mismatch" % n)
+
+    block_raw = decompress(block_raw)
+    return msgpack.unpackb(block_raw, encoding="utf-8")
+
 class DatasetReader(Sequence, pypb.abs.Close):
     """
     Reads a dataset object from a file.
@@ -130,24 +148,6 @@ class DatasetReader(Sequence, pypb.abs.Close):
     def close(self):
         self.fobj.close()
 
-    def _load_block(self, n):
-        """
-        Load the n-th block into memory.
-        """
-
-        assert 0 <= n < len(self.index)
-
-        block_start, block_size = self.index[n]
-
-        self.fobj.seek(block_start)
-        block_raw = self.fobj.read(block_size)
-        block_chksum = self.fobj.read(CHECKSUM_LEN)
-        if checksum(block_raw) != block_chksum:
-            raise IOError("Block %d checksum mismatch" % n)
-
-        block_raw = self.decompress(block_raw)
-        return msgpack.unpackb(block_raw, encoding="utf-8")
-
     def get_idx(self, n):
         """
         Get the value at given idx.
@@ -162,7 +162,7 @@ class DatasetReader(Sequence, pypb.abs.Close):
         i = n // _block_length
         j = n % _block_length
         if self.cur_block_idx != i:
-            self.cur_block = self._load_block(i)
+            self.cur_block = load_block(self.fobj, self.index, i, self.decompress)
             self.cur_block_idx = i
         return self.cur_block[j]
 
@@ -195,7 +195,7 @@ class DatasetReader(Sequence, pypb.abs.Close):
             i = n // _block_length
             j = n % _block_length
             if cur_block_idx != i:
-                cur_block = self._load_block(i)
+                cur_block = load_block(self.fobj, self.index, i, self.decompress)
                 cur_block_idx = i
             yield cur_block[j]
 
@@ -218,13 +218,13 @@ class DatasetReader(Sequence, pypb.abs.Close):
             i = n // _block_length
             j = n % _block_length
             if cur_block_idx != i:
-                cur_block = self._load_block(i)
+                cur_block = load_block(self.fobj, self.index, i, self.decompress)
                 cur_block_idx = i
             yield cur_block[j]
 
     def __iter__(self):
         for i in xrange(len(self.index)):
-            cur_block = self._load_block(i)
+            cur_block = load_block(self.fobj, self.index, i, self.decompress)
             for item in cur_block:
                 yield item
 
