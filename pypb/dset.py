@@ -16,7 +16,7 @@ Data format:
                 "index_start": <location of the index block>,
                 "index_size": <size of the index block>,
                 "serializer": "msgpack",
-                "compression": "zlib",
+                "compression": "lz4",
                 "block_length": <number of items per block>,
                 "length": <number of items in the dataset>.
             }
@@ -36,12 +36,21 @@ Data format:
 """
 
 import __builtin__
-import zlib
-import struct
 from collections import Sequence
 
-import msgpack
-import lz4
+from json import dumps as json_dumps, \
+                 loads as json_loads
+from zlib import compress as zlib_compress, \
+                 decompress as zlib_decompress, \
+                 adler32
+from struct import pack as struct_pack, \
+                   unpack as struct_unpack, \
+                   calcsize
+
+from msgpack import packb as msgpack_packb, \
+                    unpackb as msgpack_unpackb
+from lz4 import compress as lz4_compress, \
+                decompress as lz4_decompress
 
 import pypb.abs
 
@@ -51,19 +60,29 @@ PRE_HEADER_FMT = "< 12s H L"
 CHECKSUM_LEN = 4
 VERSION = 1
 
+SERIALIZER_TABLE = {
+    "msgpack": lambda x: msgpack_packb(x, use_bin_type=True),
+    "json": lambda x: json_dumps(x, ensure_ascii=False, separators=(',',':'))
+}
+
+UNSERIALIZER_TABLE = {
+    "msgpack": lambda x: msgpack_unpackb(x, encoding="utf-8"),
+    "json": json_loads
+}
+
 COMPRESSER_TABLE = {
-    "zlib": zlib.compress,
-    "lz4": lz4.compress,
+    "zlib": lambda x: zlib_compress(x, 6),
+    "lz4": lz4_compress,
 }
 
 DECOMPRESSER_TABLE = {
-    "zlib": zlib.decompress,
-    "lz4": lz4.decompress,
+    "zlib": zlib_decompress,
+    "lz4": lz4_decompress,
 }
 
 def checksum(data):
-    chksum = zlib.adler32(data) & 0xffffffff
-    chksum = struct.pack("<I", chksum)
+    chksum = adler32(data) & 0xffffffff
+    chksum = struct_pack("<I", chksum)
     return chksum
 
 def read_meta(fobj):
@@ -73,8 +92,8 @@ def read_meta(fobj):
 
     # Read the preheader
     fobj.seek(0)
-    pre_header = fobj.read(struct.calcsize(PRE_HEADER_FMT))
-    magic, version, hdr_size = struct.unpack(PRE_HEADER_FMT, pre_header)
+    pre_header = fobj.read(calcsize(PRE_HEADER_FMT))
+    magic, version, hdr_size = struct_unpack(PRE_HEADER_FMT, pre_header)
     if magic != MAGIC_STRING:
         raise IOError("Not a dataset file")
     if version < 1 or version > VERSION:
@@ -85,12 +104,17 @@ def read_meta(fobj):
     header_chksum = fobj.read(CHECKSUM_LEN)
     if checksum(header_raw) != header_chksum:
         raise IOError("Header checksum mismatch")
-    header = msgpack.unpackb(header_raw, encoding="utf-8")
+    header = msgpack_unpackb(header_raw, encoding="utf-8")
 
     # Get the decompresser function
     if header["compression"] not in DECOMPRESSER_TABLE:
         raise IOError("Unknown compression '%s'" % header["compression"])
     decompress = DECOMPRESSER_TABLE[header["compression"]]
+
+    # Get the unserializer function
+    if header["serializer"] not in UNSERIALIZER_TABLE:
+        raise IOError("Unknown serializer '%s'" % header["serializer"])
+    unserialize = UNSERIALIZER_TABLE[header["serializer"]]
 
     # Read the index
     fobj.seek(header["index_start"])
@@ -99,11 +123,11 @@ def read_meta(fobj):
     if checksum(index_raw) != index_chksum:
         raise IOError("Index checksum mismatch")
     index_raw = decompress(index_raw)
-    index = msgpack.unpackb(index_raw, encoding="utf-8")
+    index = msgpack_unpackb(index_raw, encoding="utf-8")
 
-    return version, header, decompress, index
+    return version, header, decompress, unserialize, index
 
-def load_block(fobj, index, n, decompress):
+def load_block(fobj, index, n, decompress, unserialize):
     """
     Load the n-th block into memory.
     """
@@ -119,7 +143,7 @@ def load_block(fobj, index, n, decompress):
         raise IOError("Block %d checksum mismatch" % n)
 
     block_raw = decompress(block_raw)
-    return msgpack.unpackb(block_raw, encoding="utf-8")
+    return unserialize(block_raw)
 
 class DatasetReader(Sequence, pypb.abs.Close):
     """
@@ -131,11 +155,12 @@ class DatasetReader(Sequence, pypb.abs.Close):
         self.fobj = None
         self.fobj = __builtin__.open(fname, "rb")
 
-        version, header, decompress, index = read_meta(self.fobj)
+        version, header, decompress, unserialize, index = read_meta(self.fobj)
 
         self.version = version
         self.header = header
         self.decompress = decompress
+        self.unserialize = unserialize
         self.index = index
         self.block_length = self.header["block_length"]
         self.length = self.header["length"]
@@ -144,6 +169,9 @@ class DatasetReader(Sequence, pypb.abs.Close):
         # get_idxs and get_slice use their own local block storage
         self.cur_block_idx = -1
         self.cur_block = None
+
+    def _load_block(self, i):
+        return load_block(self.fobj, self.index, i, self.decompress, self.unserialize)
 
     @pypb.abs.runonce
     def close(self):
@@ -164,7 +192,7 @@ class DatasetReader(Sequence, pypb.abs.Close):
         i = n // _block_length
         j = n % _block_length
         if self.cur_block_idx != i:
-            self.cur_block = load_block(self.fobj, self.index, i, self.decompress)
+            self.cur_block = self._load_block(i)
             self.cur_block_idx = i
         return self.cur_block[j]
 
@@ -197,7 +225,7 @@ class DatasetReader(Sequence, pypb.abs.Close):
             i = n // _block_length
             j = n % _block_length
             if cur_block_idx != i:
-                cur_block = load_block(self.fobj, self.index, i, self.decompress)
+                cur_block = self._load_block(i)
                 cur_block_idx = i
             yield cur_block[j]
 
@@ -220,13 +248,13 @@ class DatasetReader(Sequence, pypb.abs.Close):
             i = n // _block_length
             j = n % _block_length
             if cur_block_idx != i:
-                cur_block = load_block(self.fobj, self.index, i, self.decompress)
+                cur_block = self._load_block(i)
                 cur_block_idx = i
             yield cur_block[j]
 
     def __iter__(self):
         for i in xrange(len(self.index)):
-            cur_block = load_block(self.fobj, self.index, i, self.decompress)
+            cur_block = self._load_block(i)
             for item in cur_block:
                 yield item
 
@@ -246,7 +274,8 @@ class DatasetWriter(pypb.abs.Close):
     Writes a dataset object to a file.
     """
 
-    def __init__(self, fname, block_length, compression="lz4"):
+    def __init__(self, fname, block_length,
+                 compression="lz4", serializer="msgpack"):
         self.fname = fname
         self.fobj = None
         self.fobj = __builtin__.open(fname, "wb")
@@ -261,6 +290,11 @@ class DatasetWriter(pypb.abs.Close):
             raise ValueError("Unknown compression '%s'" % compression)
         self.compression = compression
         self.compress = COMPRESSER_TABLE[compression]
+
+        if serializer not in SERIALIZER_TABLE:
+            raise ValueError("Unknown serializer '%s'" % serializer)
+        self.serializer = serializer
+        self.serialize = SERIALIZER_TABLE[serializer]
 
         self.cur_block = []
         self.cur_block_idx = 0
@@ -287,7 +321,7 @@ class DatasetWriter(pypb.abs.Close):
             raise ValueError("Cant flush unfilled block without forcing")
 
         block_start = self.fobj.tell()
-        block_raw = msgpack.packb(self.cur_block, use_bin_type=True)
+        block_raw = self.serialize(self.cur_block)
         block_raw = self.compress(block_raw)
         block_chksum = checksum(block_raw)
 
@@ -307,7 +341,7 @@ class DatasetWriter(pypb.abs.Close):
         """
 
         index_start = self.fobj.tell()
-        index_raw = msgpack.packb(self.index, use_bin_type=True)
+        index_raw = msgpack_packb(self.index, use_bin_type=True)
         index_raw = self.compress(index_raw)
         index_chksum = checksum(index_raw)
 
@@ -324,19 +358,19 @@ class DatasetWriter(pypb.abs.Close):
         header = {
             "index_start": index_start,
             "index_size": index_size,
-            "serializer": "msgpack",
+            "serializer": self.serializer,
             "compression": self.compression,
             "block_length": self.block_length,
             "length": self.length
         }
-        header_raw = msgpack.packb(header, use_bin_type=True)
+        header_raw = msgpack_packb(header, use_bin_type=True)
         header_chksum = checksum(header_raw)
 
         magic = MAGIC_STRING
         version = VERSION
         hdr_size = len(header_raw)
 
-        pre_header = struct.pack(PRE_HEADER_FMT, magic, version, hdr_size)
+        pre_header = struct_pack(PRE_HEADER_FMT, magic, version, hdr_size)
 
         assert len(pre_header) + len(header_raw) + len(header_chksum) < HEADER_SPACE
 
@@ -370,7 +404,7 @@ class DatasetAppender(DatasetWriter):
         self.fobj = None
         self.fobj = __builtin__.open(fname, "r+b")
 
-        _, header, decompress, index = read_meta(self.fobj)
+        _, header, decompress, unserializer, index = read_meta(self.fobj)
 
         self.block_length = header["block_length"]
         self.length = header["length"]
@@ -380,9 +414,16 @@ class DatasetAppender(DatasetWriter):
         self.compression = header["compression"]
         self.compress = COMPRESSER_TABLE[header["compression"]]
 
+        if header["serializer"] not in SERIALIZER_TABLE:
+            raise ValueError("Unknown serializer '%s'" % header["serializer"])
+        self.serializer = header["serializer"]
+        self.serialize = SERIALIZER_TABLE[header["serializer"]]
+
         if len(index) > 0:
             self.cur_block_idx = len(index) - 1
-            self.cur_block = load_block(self.fobj, index, self.cur_block_idx, decompress)
+            self.cur_block = load_block(self.fobj,
+                                        index, self.cur_block_idx,
+                                        decompress, unserializer)
 
             # Remove last entry from index
             index.pop()
@@ -400,7 +441,8 @@ class DatasetAppender(DatasetWriter):
         index_size = header["index_size"]
         self.fobj.seek(index_start + index_size + CHECKSUM_LEN)
 
-def open(fname, mode="r", block_length=None, compression="lz4"): # pylint: disable=redefined-builtin
+def open(fname, mode="r", block_length=None,       # pylint: disable=redefined-builtin
+         compression="lz4", serializer="msgpack"):
     """
     Open a dataset for reading or writing.
     """
@@ -410,7 +452,7 @@ def open(fname, mode="r", block_length=None, compression="lz4"): # pylint: disab
     elif mode == "w":
         if block_length is None:
             raise ValueError("Must specify block_length for write mode")
-        return DatasetWriter(fname, block_length, compression)
+        return DatasetWriter(fname, block_length, compression, serializer)
     elif mode == "a":
         return DatasetAppender(fname)
     else:

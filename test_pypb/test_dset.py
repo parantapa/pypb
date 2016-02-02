@@ -18,6 +18,29 @@ def test_data(request):
 def block_length(request):
     return request.param
 
+def test_simple(tmpdir, test_data, block_length):
+    """
+    Test the different serializers and compression algos.
+    """
+
+    for compression in pypb.dset.COMPRESSER_TABLE.keys():
+        for serializer in pypb.dset.SERIALIZER_TABLE.keys():
+
+            fname = "test-%s-%s.dset" % (compression, serializer)
+            fname = tmpdir.join(fname).strpath
+
+            params = {
+                "block_length": block_length,
+                "compression": compression,
+                "serializer": serializer
+            }
+
+            with pypb.dset.open(fname, "w", **params) as dset:
+                dset.extend(test_data)
+
+            with pypb.dset.open(fname) as dset:
+                assert test_data == list(dset)
+
 def test_append(tmpdir, test_data, block_length):
     """
     Test the iterator version.
