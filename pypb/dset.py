@@ -53,6 +53,8 @@ from lz4 import compress as lz4_compress, \
                 decompress as lz4_decompress
 
 import pypb.abs
+from pypb.msgpackz import packb as msgpackz_packb, \
+                          unpackb as msgpackz_unpackb
 
 MAGIC_STRING = "pb's dataset"
 HEADER_SPACE = 4096
@@ -62,12 +64,14 @@ VERSION = 1
 
 SERIALIZER_TABLE = {
     "msgpack": lambda x: msgpack_packb(x, use_bin_type=True),
-    "json": lambda x: json_dumps(x, ensure_ascii=False, separators=(',',':'))
+    "json": lambda x: json_dumps(x, ensure_ascii=False, separators=(',',':')),
+    "msgpackz": msgpackz_packb
 }
 
 UNSERIALIZER_TABLE = {
     "msgpack": lambda x: msgpack_unpackb(x, encoding="utf-8"),
-    "json": json_loads
+    "json": json_loads,
+    "msgpackz": msgpackz_unpackb
 }
 
 COMPRESSER_TABLE = {
