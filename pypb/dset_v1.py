@@ -8,36 +8,38 @@ compressed with zlib.
 
 Data format:
     First 4KB:
-        Magic string: "pb's dataset" (12 bytes)
-        Version: little endian 2 byte unsigned integer
-        Header size: little endian 4 byte unsigned integer
-        Header checksum: 4 bytes + 4 bytes
+        Magic string : "pb's dataset" (12 bytes)
+        Version : little endian 2 byte unsigned integer
+        Header size : little endian 4 byte unsigned integer
         Header: varaible sized msgpack object
             {
                 "index_start": <location of the index block>,
                 "index_size": <size of the index block>,
-                "index_size_raw": <size of the index block uncompressed>,
                 "serializer": "msgpack",
                 "compression": "lz4",
                 "block_length": <number of items per block>,
                 "length": <number of items in the dataset>.
             }
+        Header checksum: 4 bytes
 
-    Block checksum: 4 bytes + 4 bytes
+
     Block: variable sized compressed msgpack object
+    Block checksum: 4 bytes
     ...
 
-    Index checksum: 4 bytes + 4 bytes
     Index: variable sized compressed msgpack object
         [
-            [block_start, block_size, block_size_raw],
+            [block_start, block_size],
             ...
         ]
+    Index checksum: 4 bytes
 """
 
 import __builtin__
 from collections import Sequence
 
+from json import dumps as json_dumps, \
+                 loads as json_loads
 from zlib import compress as zlib_compress, \
                  decompress as zlib_decompress, \
                  adler32
@@ -51,20 +53,25 @@ from lz4 import compress as lz4_compress, \
                 decompress as lz4_decompress
 
 import pypb.abs
+from pypb.msgpackz import packb as msgpackz_packb, \
+                          unpackb as msgpackz_unpackb
 
 MAGIC_STRING = "pb's dataset"
 HEADER_SPACE = 4096
 PRE_HEADER_FMT = "< 12s H L"
-CHECKSUM_FMT = "< I I"
-CHECKSUM_LEN = calcsize(CHECKSUM_FMT)
-VERSION = 2
+CHECKSUM_LEN = 4
+VERSION = 1
 
 SERIALIZER_TABLE = {
     "msgpack": lambda x: msgpack_packb(x, use_bin_type=True),
+    "json": lambda x: json_dumps(x, ensure_ascii=False, separators=(',',':')),
+    "msgpackz": msgpackz_packb
 }
 
 UNSERIALIZER_TABLE = {
     "msgpack": lambda x: msgpack_unpackb(x, encoding="utf-8"),
+    "json": json_loads,
+    "msgpackz": msgpackz_unpackb
 }
 
 COMPRESSER_TABLE = {
@@ -78,9 +85,9 @@ DECOMPRESSER_TABLE = {
 }
 
 def checksum(data):
-    size = len(data)
     chksum = adler32(data) & 0xffffffff
-    return struct_pack(CHECKSUM_FMT, size, chksum)
+    chksum = struct_pack("<I", chksum)
+    return chksum
 
 def read_meta(fobj):
     """
@@ -93,12 +100,12 @@ def read_meta(fobj):
     magic, version, hdr_size = struct_unpack(PRE_HEADER_FMT, pre_header)
     if magic != MAGIC_STRING:
         raise IOError("Not a dataset file")
-    if version != VERSION:
+    if version < 1 or version > VERSION:
         raise IOError("Invalid version %d" % version)
 
     # Read the header
-    header_chksum = fobj.read(CHECKSUM_LEN)
     header_raw = fobj.read(hdr_size)
+    header_chksum = fobj.read(CHECKSUM_LEN)
     if checksum(header_raw) != header_chksum:
         raise IOError("Header checksum mismatch")
     header = msgpack_unpackb(header_raw, encoding="utf-8")
@@ -115,8 +122,8 @@ def read_meta(fobj):
 
     # Read the index
     fobj.seek(header["index_start"])
-    index_chksum = fobj.read(CHECKSUM_LEN)
     index_raw = fobj.read(header["index_size"])
+    index_chksum = fobj.read(CHECKSUM_LEN)
     if checksum(index_raw) != index_chksum:
         raise IOError("Index checksum mismatch")
     index_raw = decompress(index_raw)
@@ -131,11 +138,11 @@ def load_block(fobj, index, n, decompress, unserialize):
 
     assert 0 <= n < len(index)
 
-    block_start, block_size, _ = index[n]
+    block_start, block_size = index[n]
 
     fobj.seek(block_start)
-    block_chksum = fobj.read(CHECKSUM_LEN)
     block_raw = fobj.read(block_size)
+    block_chksum = fobj.read(CHECKSUM_LEN)
     if checksum(block_raw) != block_chksum:
         raise IOError("Block %d checksum mismatch" % n)
 
@@ -305,8 +312,8 @@ class DatasetWriter(pypb.abs.Close):
     def close(self):
         if self.fobj is not None:
             self._flush(force=True)
-            index_start, index_size, index_size_raw = self._write_index()
-            self._write_header(index_start, index_size, index_size_raw)
+            index_start, index_size = self._write_index()
+            self._write_header(index_start, index_size)
             self.fobj.close()
 
     def _flush(self, force=False):
@@ -317,20 +324,15 @@ class DatasetWriter(pypb.abs.Close):
         if len(self.cur_block) != self.block_length and not force:
             raise ValueError("Cant flush unfilled block without forcing")
 
-        # Dont write empty blocks
-        # This happens when current block is empty and file is closed.
-        if not self.cur_block:
-            return
-
         block_start = self.fobj.tell()
         block_raw = self.serialize(self.cur_block)
-        block_comp = self.compress(block_raw)
-        block_chksum = checksum(block_comp)
+        block_raw = self.compress(block_raw)
+        block_chksum = checksum(block_raw)
 
-        self.index.append((block_start, len(block_comp), len(block_raw)))
+        self.index.append((block_start, len(block_raw)))
 
+        self.fobj.write(block_raw)
         self.fobj.write(block_chksum)
-        self.fobj.write(block_comp)
 
         self.cur_block = []
         self.cur_block_idx += 1
@@ -344,15 +346,15 @@ class DatasetWriter(pypb.abs.Close):
 
         index_start = self.fobj.tell()
         index_raw = msgpack_packb(self.index, use_bin_type=True)
-        index_comp = self.compress(index_raw)
-        index_chksum = checksum(index_comp)
+        index_raw = self.compress(index_raw)
+        index_chksum = checksum(index_raw)
 
+        self.fobj.write(index_raw)
         self.fobj.write(index_chksum)
-        self.fobj.write(index_comp)
 
-        return index_start, len(index_comp), len(index_raw)
+        return index_start, len(index_raw)
 
-    def _write_header(self, index_start, index_size, index_size_raw):
+    def _write_header(self, index_start, index_size):
         """
         Write the header to the file.
         """
@@ -360,7 +362,6 @@ class DatasetWriter(pypb.abs.Close):
         header = {
             "index_start": index_start,
             "index_size": index_size,
-            "index_raw": index_size_raw,
             "serializer": self.serializer,
             "compression": self.compression,
             "block_length": self.block_length,
@@ -379,8 +380,8 @@ class DatasetWriter(pypb.abs.Close):
 
         self.fobj.seek(0)
         self.fobj.write(pre_header)
-        self.fobj.write(header_chksum)
         self.fobj.write(header_raw)
+        self.fobj.write(header_chksum)
 
     def append(self, item):
         if len(self.cur_block) == self.block_length:
@@ -442,7 +443,7 @@ class DatasetAppender(DatasetWriter):
         # But it reduces the chances of total loss in case of crash.
         index_start = header["index_start"]
         index_size = header["index_size"]
-        self.fobj.seek(index_start + CHECKSUM_LEN + index_size)
+        self.fobj.seek(index_start + index_size + CHECKSUM_LEN)
 
 def open(fname, mode="r", block_length=None,       # pylint: disable=redefined-builtin
          compression="lz4", serializer="msgpack"):
