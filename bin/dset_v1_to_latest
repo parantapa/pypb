@@ -18,7 +18,7 @@ def main():
 
     params = {
         "block_length": din.block_length,
-        "compression": din.compression
+        "compression": din.header["compression"]
     }
     with pypb.dset.open(ofname, "w", **params) as dout:
         dout.extend(din)
