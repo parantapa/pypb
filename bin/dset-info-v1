@@ -20,10 +20,6 @@ def main():
         with pypb.dset.open(fname) as dset:
             print(fname)
 
-            msg = "    version: {}"
-            msg = msg.format(dset.version)
-            print(msg)
-
             keys = set(dset.header.keys()) - set(OKEYS)
             keys = sorted(keys)
             keys = OKEYS + keys
@@ -42,11 +38,11 @@ def main():
             print(msg)
 
             msg = "    avg(block_size): {:,.2f}"
-            msg = msg.format(sum(x[1] for x in dset.index) / len(dset.index))
+            msg = msg.format(sum(x for _, x in dset.index) / len(dset.index))
             print(msg)
 
-            msg = "    avg(block_size_raw): {:,.2f}"
-            msg = msg.format(sum(x[2] for x in dset.index) / len(dset.index))
+            msg = "    version: {}"
+            msg = msg.format(dset.version)
             print(msg)
 
 if __name__ == '__main__':
