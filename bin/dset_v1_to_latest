@@ -1,0 +1,27 @@
+#!/usr/bin/env python2
+# encoding: utf-8
+"""
+Convert version 1 data files to latest version.
+"""
+
+from __future__ import division, print_function, unicode_literals
+
+import sys
+
+import pypb.dset_v1
+import pypb.dset
+
+def main():
+    _, ifname, ofname = sys.argv
+
+    din = pypb.dset_v1.open(ifname)
+
+    params = {
+        "block_length": din.block_length,
+        "compression": din.compression
+    }
+    with pypb.dset.open(ofname, "w", **params) as dout:
+        dout.extend(din)
+
+if __name__ == '__main__':
+    main()
