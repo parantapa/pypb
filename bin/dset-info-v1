@@ -7,7 +7,7 @@ Print information about a dset file.
 from __future__ import division, print_function
 
 import sys
-import pypb.dset
+import pypb.dset_v1 as dataset
 
 OKEYS = ["length", "block_length", "serializer", "compression"]
 
@@ -17,7 +17,7 @@ def main():
         sys.exit(1)
 
     for fname in sys.argv[1:]:
-        with pypb.dset.open(fname) as dset:
+        with dataset.open(fname) as dset:
             print(fname)
 
             keys = set(dset.header.keys()) - set(OKEYS)
