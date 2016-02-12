@@ -41,13 +41,14 @@ def main():
             msg = msg.format(len(dset.index))
             print(msg)
 
-            msg = "    avg(block_size): {:,.2f}"
-            msg = msg.format(sum(x[1] for x in dset.index) / len(dset.index))
-            print(msg)
+            if dset.index:
+                msg = "    avg(block_size): {:,.2f}"
+                msg = msg.format(sum(x[1] for x in dset.index) / len(dset.index))
+                print(msg)
 
-            msg = "    avg(block_size_raw): {:,.2f}"
-            msg = msg.format(sum(x[2] for x in dset.index) / len(dset.index))
-            print(msg)
+                msg = "    avg(block_size_raw): {:,.2f}"
+                msg = msg.format(sum(x[2] for x in dset.index) / len(dset.index))
+                print(msg)
 
 if __name__ == '__main__':
     main()
