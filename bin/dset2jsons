@@ -1,0 +1,27 @@
+#!/usr/bin/env python2
+# encoding: utf-8
+"""
+Convert a dset file to newline separated json file
+"""
+
+from __future__ import division, print_function, unicode_literals
+
+import sys
+import json
+import gzip
+import pypb.dset
+
+def main():
+    try:
+        _, ifname, ofname = sys.argv
+    except ValueError:
+        print("dset2jsons ifname ofname")
+        sys.exit(1)
+
+    with pypb.dset.open(ifname) as dset:
+        with gzip.open(ofname, "wb", 6) as fout:
+            for obj in dset:
+                fout.write(json.dumps(obj) + "\n")
+
+if __name__ == '__main__':
+    main()
