@@ -1,0 +1,39 @@
+#!/usr/bin/env python2
+# encoding: utf-8
+"""
+
+Create a sorted version of the dataset.
+"""
+
+from __future__ import division, print_function
+
+import sys
+
+import pypb.dset
+import pypb.dset_sort
+
+def main():
+    usage = "Usage: dset-sort cache_blocks (doc|row) ifname ofname"
+    try:
+        _, cache_blocks, keytype, ifname, ofname = sys.argv
+        cache_blocks = int(cache_blocks)
+        keyfn = {
+            "doc": pypb.dset_sort.id_key,
+            "d": pypb.dset_sort.id_key,
+            "row": pypb.dset_sort.first_idx_key,
+            "r": pypb.dset_sort.first_idx_key
+        }[keytype]
+    except (ValueError, KeyError):
+        print(usage)
+        sys.exit(1)
+
+    with pypb.dset.open(ifname) as din:
+        params = {"block_length": din.block_length,
+                  "compression": din.header["compression"]}
+        with pypb.dset.open(ofname, "w", **params) as dout:
+            pypb.dset_sort.dset_sort(din, dout,
+                                     keyfn, cache_blocks,
+                                     show_progress=True)
+
+if __name__ == '__main__':
+    main()

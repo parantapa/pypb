@@ -15,7 +15,7 @@ def main():
     try:
         _, ifname, ofname = sys.argv
     except ValueError:
-        print("dset2jsons ifname ofname")
+        print("Usage: dset2jsons ifname ofname")
         sys.exit(1)
 
     with pypb.dset.open(ifname) as dset:

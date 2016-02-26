@@ -13,7 +13,7 @@ OKEYS = ["length", "block_length", "serializer", "compression"]
 
 def main():
     if len(sys.argv) < 2:
-        print("dset-info: <fname.dset>...")
+        print("Usage: dset-info <fname.dset>...")
         sys.exit(1)
 
     for fname in sys.argv[1:]:

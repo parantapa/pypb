@@ -15,7 +15,7 @@ import pypb.dset
 def main():
     fnames = sys.argv[1:]
     if len(fnames) < 2:
-        print("msgpacks2dset [ifname]... ofname")
+        print("Usage: msgpacks2dset [ifname]... ofname")
         sys.exit(1)
 
     ifnames = fnames[:-1]
