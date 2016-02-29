@@ -57,7 +57,7 @@ HEADER_SPACE = 4096
 PRE_HEADER_FMT = "< 12s H L"
 CHECKSUM_FMT = "< I I"
 CHECKSUM_LEN = calcsize(CHECKSUM_FMT)
-VERSION = 3
+VERSION = 2
 
 SERIALIZER_TABLE = {
     "msgpack": lambda x: msgpack_packb(x, use_bin_type=True),
@@ -124,7 +124,7 @@ def read_meta(fobj):
 
     return version, header, decompress, unserialize, index
 
-def load_block(fobj, index, n, decompress):
+def load_block(fobj, index, n, decompress, unserialize):
     """
     Load the n-th block into memory.
     """
@@ -140,7 +140,7 @@ def load_block(fobj, index, n, decompress):
         raise IOError("Block %d checksum mismatch" % n)
 
     block_raw = decompress(block_raw)
-    return msgpack_unpackb(block_raw, encoding="utf-8")
+    return unserialize(block_raw)
 
 class DatasetReader(Sequence, pypb.abs.Close):
     """
@@ -168,7 +168,7 @@ class DatasetReader(Sequence, pypb.abs.Close):
         self.cur_block = None
 
     def _load_block(self, i):
-        return load_block(self.fobj, self.index, i, self.decompress)
+        return load_block(self.fobj, self.index, i, self.decompress, self.unserialize)
 
     @pypb.abs.runonce
     def close(self):
@@ -191,7 +191,7 @@ class DatasetReader(Sequence, pypb.abs.Close):
         if self.cur_block_idx != i:
             self.cur_block = self._load_block(i)
             self.cur_block_idx = i
-        return self.unserialize(self.cur_block[j])
+        return self.cur_block[j]
 
     def get_slice(self, *args):
         """
@@ -224,7 +224,7 @@ class DatasetReader(Sequence, pypb.abs.Close):
             if cur_block_idx != i:
                 cur_block = self._load_block(i)
                 cur_block_idx = i
-            yield self.unserialize(cur_block[j])
+            yield cur_block[j]
 
     def get_idxs(self, ns):
         """
@@ -247,13 +247,13 @@ class DatasetReader(Sequence, pypb.abs.Close):
             if cur_block_idx != i:
                 cur_block = self._load_block(i)
                 cur_block_idx = i
-            yield self.unserialize(cur_block[j])
+            yield cur_block[j]
 
     def __iter__(self):
         for i in xrange(len(self.index)):
             cur_block = self._load_block(i)
             for item in cur_block:
-                yield self.unserialize(item)
+                yield item
 
     def __len__(self):
         return self.length
@@ -323,7 +323,7 @@ class DatasetWriter(pypb.abs.Close):
             return
 
         block_start = self.fobj.tell()
-        block_raw = msgpack_packb(self.cur_block, use_bin_type=True)
+        block_raw = self.serialize(self.cur_block)
         block_comp = self.compress(block_raw)
         block_chksum = checksum(block_comp)
 
@@ -385,14 +385,14 @@ class DatasetWriter(pypb.abs.Close):
     def append(self, item):
         if len(self.cur_block) == self.block_length:
             self._flush()
-        self.cur_block.append(self.serialize(item))
+        self.cur_block.append(item)
         self.length += 1
 
     def extend(self, iterable):
         if len(self.cur_block) == self.block_length:
             self._flush()
         for item in iterable:
-            self.cur_block.append(self.serialize(item))
+            self.cur_block.append(item)
             self.length += 1
             if len(self.cur_block) == self.block_length:
                 self._flush()
@@ -407,7 +407,7 @@ class DatasetAppender(DatasetWriter):
         self.fobj = None
         self.fobj = __builtin__.open(fname, "r+b")
 
-        _, header, decompress, _, index = read_meta(self.fobj)
+        _, header, decompress, unserializer, index = read_meta(self.fobj)
 
         self.block_length = header["block_length"]
         self.length = header["length"]
@@ -426,7 +426,7 @@ class DatasetAppender(DatasetWriter):
             self.cur_block_idx = len(index) - 1
             self.cur_block = load_block(self.fobj,
                                         index, self.cur_block_idx,
-                                        decompress)
+                                        decompress, unserializer)
 
             # Remove last entry from index
             index.pop()

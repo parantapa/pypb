@@ -56,6 +56,7 @@ def dset_sort(din, dout, keyfn, cache_blocks, show_progress=False):
 
     # NOTE: We do our own looping
     # We access _load_block method of the src dataset
+    # We also access the _flush method of the dst object
     cur_block_idx = -1
     cur_block = None
     _block_length = din.block_length
@@ -79,6 +80,7 @@ def dset_sort(din, dout, keyfn, cache_blocks, show_progress=False):
         idxs.sort(key=lambda x: x[0])
 
         cache = [None] * len(idxs)
+        # NOTE: we are bypassing the __iter__ method of src
         for srci, dsti in idxs:
             i = srci // _block_length
             j = srci % _block_length
@@ -88,7 +90,14 @@ def dset_sort(din, dout, keyfn, cache_blocks, show_progress=False):
                 cur_block_idx = i
             cache[dsti] = cur_block[j]
 
-        dout.extend(cache)
+        # NOTE: we are bypassing the extend method of dst
+        if len(dout.cur_block) == dout.block_length:
+            dout._flush()
+        for item in cache:
+            dout.cur_block.append(item)
+            dout.length += 1
+            if len(dout.cur_block) == dout.block_length:
+                dout._flush()
 
         # Free up the cache
         del cache
