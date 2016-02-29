@@ -1,13 +1,13 @@
 #!/usr/bin/env python2
 # encoding: utf-8
 """
-Print information about a dset file.
+Print information about a dset (v2) file.
 """
 
 from __future__ import division, print_function
 
 import sys
-import pypb.dset_v2 as dataset
+import pypb.dset_v2
 
 OKEYS = ["length", "block_length", "serializer", "compression"]
 
@@ -17,8 +17,12 @@ def main():
         sys.exit(1)
 
     for fname in sys.argv[1:]:
-        with dataset.open(fname) as dset:
+        with pypb.dset_v2.open(fname) as dset:
             print(fname)
+
+            msg = "    version: {}"
+            msg = msg.format(dset.version)
+            print(msg)
 
             keys = set(dset.header.keys()) - set(OKEYS)
             keys = sorted(keys)
@@ -37,13 +41,14 @@ def main():
             msg = msg.format(len(dset.index))
             print(msg)
 
-            msg = "    avg(block_size): {:,.2f}"
-            msg = msg.format(sum(x for _, x in dset.index) / len(dset.index))
-            print(msg)
+            if dset.index:
+                msg = "    avg(block_size): {:,.2f}"
+                msg = msg.format(sum(x[1] for x in dset.index) / len(dset.index))
+                print(msg)
 
-            msg = "    version: {}"
-            msg = msg.format(dset.version)
-            print(msg)
+                msg = "    avg(block_size_raw): {:,.2f}"
+                msg = msg.format(sum(x[2] for x in dset.index) / len(dset.index))
+                print(msg)
 
 if __name__ == '__main__':
     main()
