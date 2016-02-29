@@ -14,7 +14,7 @@ import pypb.dset
 def main():
     _, ifname, ofname = sys.argv
 
-    din = pypb.dset_v1.open(ifname)
+    din = pypb.dset_v2.open(ifname)
 
     params = {
         "block_length": din.block_length,
