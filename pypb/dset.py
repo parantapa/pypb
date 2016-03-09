@@ -423,15 +423,22 @@ class DatasetAppender(DatasetWriter):
         self.serialize = SERIALIZER_TABLE[header["serializer"]]
 
         if len(index) > 0:
-            self.cur_block_idx = len(index) - 1
-            self.cur_block = load_block(self.fobj,
-                                        index, self.cur_block_idx,
-                                        decompress)
+            # The last block is not full
+            if self.length % self.block_length != 0:
+                self.cur_block_idx = len(index) - 1
+                self.cur_block = load_block(self.fobj,
+                                            index, self.cur_block_idx,
+                                            decompress)
 
-            # Remove last entry from index
-            index.pop()
+                # Remove last entry from index
+                index.pop()
 
-            self.index = index
+                self.index = index
+
+            else:
+                self.cur_block_idx = len(index)
+                self.cur_block = []
+                self.index = index
         else:
             self.cur_block_idx = 0
             self.cur_block = []
