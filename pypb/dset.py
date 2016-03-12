@@ -45,12 +45,38 @@ from struct import pack as struct_pack, \
                    unpack as struct_unpack, \
                    calcsize
 
-from msgpack import packb as msgpack_packb, \
-                    unpackb as msgpack_unpackb
+from msgpack import packb as _msgpack_packb, \
+                    unpackb as _msgpack_unpackb
 from lz4 import compress as lz4_compress, \
                 decompress as lz4_decompress
+from backports.lzma import compress as _xz_compress, \
+                           decompress as _xz_decompress, \
+                           FORMAT_RAW, CHECK_NONE, FILTER_LZMA2
 
 import pypb.abs
+
+def msgpack_packb(x):
+    return _msgpack_packb(x, use_bin_type=True)
+
+def msgpack_unpackb(x):
+    return _msgpack_unpackb(x, encoding="utf-8")
+
+XZ_FILTERS = [
+    {"id": FILTER_LZMA2, "preset": 6}
+]
+
+def xz_compress(x):
+    return _xz_compress(x,
+                        format=FORMAT_RAW,
+                        check=CHECK_NONE,
+                        preset=None,
+                        filters=XZ_FILTERS)
+
+def xz_decompress(x):
+    return _xz_decompress(x,
+                          format=FORMAT_RAW,
+                          memlimit=None,
+                          filters=XZ_FILTERS)
 
 MAGIC_STRING = "pb's dataset"
 HEADER_SPACE = 4096
@@ -60,21 +86,23 @@ CHECKSUM_LEN = calcsize(CHECKSUM_FMT)
 VERSION = 3
 
 SERIALIZER_TABLE = {
-    "msgpack": lambda x: msgpack_packb(x, use_bin_type=True),
+    "msgpack": msgpack_packb
 }
 
 UNSERIALIZER_TABLE = {
-    "msgpack": lambda x: msgpack_unpackb(x, encoding="utf-8"),
+    "msgpack": msgpack_unpackb
 }
 
 COMPRESSER_TABLE = {
     "zlib": lambda x: zlib_compress(x, 6),
     "lz4": lz4_compress,
+    "xz": xz_compress,
 }
 
 DECOMPRESSER_TABLE = {
     "zlib": zlib_decompress,
     "lz4": lz4_decompress,
+    "xz": xz_decompress,
 }
 
 def checksum(data):
@@ -101,7 +129,7 @@ def read_meta(fobj):
     header_raw = fobj.read(hdr_size)
     if checksum(header_raw) != header_chksum:
         raise IOError("Header checksum mismatch")
-    header = msgpack_unpackb(header_raw, encoding="utf-8")
+    header = msgpack_unpackb(header_raw)
 
     # Get the decompresser function
     if header["compression"] not in DECOMPRESSER_TABLE:
@@ -120,7 +148,7 @@ def read_meta(fobj):
     if checksum(index_raw) != index_chksum:
         raise IOError("Index checksum mismatch")
     index_raw = decompress(index_raw)
-    index = msgpack_unpackb(index_raw, encoding="utf-8")
+    index = msgpack_unpackb(index_raw)
 
     return version, header, decompress, unserialize, index
 
@@ -140,7 +168,7 @@ def load_block(fobj, index, n, decompress):
         raise IOError("Block %d checksum mismatch" % n)
 
     block_raw = decompress(block_raw)
-    return msgpack_unpackb(block_raw, encoding="utf-8")
+    return msgpack_unpackb(block_raw)
 
 class DatasetReader(Sequence, pypb.abs.Close):
     """
@@ -323,7 +351,7 @@ class DatasetWriter(pypb.abs.Close):
             return
 
         block_start = self.fobj.tell()
-        block_raw = msgpack_packb(self.cur_block, use_bin_type=True)
+        block_raw = msgpack_packb(self.cur_block)
         block_comp = self.compress(block_raw)
         block_chksum = checksum(block_comp)
 
@@ -343,7 +371,7 @@ class DatasetWriter(pypb.abs.Close):
         """
 
         index_start = self.fobj.tell()
-        index_raw = msgpack_packb(self.index, use_bin_type=True)
+        index_raw = msgpack_packb(self.index)
         index_comp = self.compress(index_raw)
         index_chksum = checksum(index_comp)
 
@@ -366,7 +394,7 @@ class DatasetWriter(pypb.abs.Close):
             "block_length": self.block_length,
             "length": self.length
         }
-        header_raw = msgpack_packb(header, use_bin_type=True)
+        header_raw = msgpack_packb(header)
         header_chksum = checksum(header_raw)
 
         magic = MAGIC_STRING
