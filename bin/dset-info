@@ -7,9 +7,14 @@ Print information about a dset file.
 from __future__ import division, print_function
 
 import sys
-import pypb.dset
+from pypb.dset import read_preheader, open as open_latest
+from pypb.dset_v1 import open as open_v1
+from pypb.dset_v2 import open as open_v2
 
 OKEYS = ["length", "block_length", "serializer", "compression"]
+
+def puts(fmt, *args):
+    print("  " + fmt.format(*args))
 
 def main():
     if len(sys.argv) < 2:
@@ -17,12 +22,18 @@ def main():
         sys.exit(1)
 
     for fname in sys.argv[1:]:
-        with pypb.dset.open(fname) as dset:
-            print(fname)
+        with open(fname) as fobj:
+            version, _ = read_preheader(fobj)
+            if version == 1:
+                opener = open_v1
+            elif version == 2:
+                opener = open_v2
+            else:
+                opener = open_latest
 
-            msg = "    version: {}"
-            msg = msg.format(dset.version)
-            print(msg)
+        with opener(fname) as dset:
+            print(fname)
+            puts("version: {}", dset.version)
 
             keys = set(dset.header.keys()) - set(OKEYS)
             keys = sorted(keys)
@@ -31,24 +42,26 @@ def main():
                 v = dset.header[k]
 
                 if isinstance(v, (int, long)):
-                    msg = "    {}: {:,d}"
+                    puts("{}: {:,d}", k, v)
                 else:
-                    msg = "    {}: {}"
-                msg = msg.format(k, v)
-                print(msg)
+                    puts("{}: {}", k, v)
 
-            msg = "    len(index): {:,d}"
-            msg = msg.format(len(dset.index))
-            print(msg)
+            puts("len(index): {:,d}", len(dset.index))
 
-            if dset.index:
-                msg = "    avg(block_size): {:,.2f}"
-                msg = msg.format(sum(x[1] for x in dset.index) / len(dset.index))
-                print(msg)
+            if not dset.index:
+                return
 
-                msg = "    avg(block_size_raw): {:,.2f}"
-                msg = msg.format(sum(x[2] for x in dset.index) / len(dset.index))
-                print(msg)
+            avg_bs = sum(x[1] for x in dset.index) / len(dset.index)
+            puts("avg(block_size): {:,.2f}", avg_bs)
+
+            if dset.version < 2:
+                return
+
+            avg_bs_raw = sum(x[2] for x in dset.index) / len(dset.index)
+            puts("avg(block_size_raw): {:,.2f}", avg_bs_raw)
+
+            comp_ratio = avg_bs / avg_bs_raw * 100
+            puts("comp_ratio: {:,.2f}%", comp_ratio)
 
 if __name__ == '__main__':
     main()

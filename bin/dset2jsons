@@ -4,21 +4,22 @@
 Convert a dset file to newline separated json file
 """
 
-from __future__ import division, print_function, unicode_literals
+from __future__ import print_function
 
 import sys
 import json
 import gzip
-import pypb.dset
+
+import pypb.dset as ds
 
 def main():
     try:
         _, ifname, ofname = sys.argv
     except ValueError:
-        print("Usage: dset2jsons ifname ofname")
+        print("Usage: dset2jsons <ifname.dset> <ofname.jsons.gz>")
         sys.exit(1)
 
-    with pypb.dset.open(ifname) as dset:
+    with ds.open(ifname) as dset:
         with gzip.open(ofname, "wb", 6) as fout:
             for obj in dset:
                 fout.write(json.dumps(obj) + "\n")

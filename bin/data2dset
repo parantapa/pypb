@@ -1,0 +1,57 @@
+#!/usr/bin/env python2
+# encoding: utf-8
+"""
+Convert a list of gzipped msgpack/json files to a dataset file.
+
+Usage:
+  data2dset [options] (-o <ofname>) <ifname>...
+
+Options
+  -i <ifmt>, --iserializer <ifmt>  Input serializer method [default: msgpack]
+  -n <len>, --blocklength <len>    Output Block length [default: 1000]
+  -c <comp>, --compression <comp>  Output compression method [default: lz4]
+  -s <fmt>, --serializer <fmt>     Output serializer method [default: msgpack]
+  -o <ofname>, --output <ofname>   Output filename
+"""
+
+import gzip
+import json
+
+import msgpack
+from docopt import docopt
+
+import pypb.dset as ds
+
+def main():
+    args = docopt(__doc__)
+
+    blocklength = args["--blocklength"]
+    blocklength = int(blocklength)
+
+    inp_serializer = args["--iserializer"]
+    compression = args["--compression"]
+    serializer = args["--serializer"]
+    ofname = args["--output"]
+    ifnames = args["<ifname>"]
+
+    params = {
+        "block_length": blocklength,
+        "compression": compression,
+        "serializer": serializer,
+    }
+
+    with ds.open(ofname, "w", **params) as dset:
+        for ifname in ifnames:
+            with gzip.open(ifname) as fin:
+                if inp_serializer == "msgpack":
+                    unpacker = msgpack.Unpacker(fin, encoding="utf-8")
+                    dset.extend(unpacker)
+                elif inp_serializer == "json":
+                    for line in fin:
+                        if not line.strip(): continue
+                        dset.append(json.loads(line))
+                else:
+                    raise ValueError("Unknown input format: %s" % inp_serializer)
+
+if __name__ == '__main__':
+    main()

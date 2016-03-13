@@ -11,7 +11,7 @@ from __future__ import division, print_function
 import sys
 from pprint import PrettyPrinter
 
-import pypb.dset
+import pypb.dset as ds
 
 # Make pprint support unicode
 # http://stackoverflow.com/questions/10883399/unable-to-encode-decode-pprint-output
@@ -32,7 +32,7 @@ def pprint(obj):
 def main():
     if len(sys.argv) == 2:
         fname = sys.argv[1]
-        with pypb.dset.open(fname) as dset:
+        with ds.open(fname) as dset:
             for item in dset:
                 pprint(item)
 
@@ -44,7 +44,7 @@ def main():
         if "," in key:
             key = key.strip().split(",")
             key = map(int, key)
-            with pypb.dset.open(fname) as dset:
+            with ds.open(fname) as dset:
                 for item in dset.get_idxs(key):
                     pprint(item)
 
@@ -52,14 +52,14 @@ def main():
         elif ":" in key:
             key = key.strip().split(":")
             key = [(int(k) if k.strip() else None) for k in key]
-            with pypb.dset.open(fname) as dset:
+            with ds.open(fname) as dset:
                 for item in dset.get_slice(*key):
                     pprint(item)
 
         # Using a single index
         else:
             idx = int(key)
-            with pypb.dset.open(fname) as dset:
+            with ds.open(fname) as dset:
                 pprint(dset.get_idx(idx))
     else:
         print(__doc__)

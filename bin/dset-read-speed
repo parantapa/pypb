@@ -9,7 +9,7 @@ from __future__ import division, print_function
 import sys
 from datetime import datetime
 
-import pypb.dset
+import pypb.dset as ds
 
 def main():
     try:
@@ -19,7 +19,7 @@ def main():
         sys.exit(1)
 
     start = datetime.utcnow()
-    with pypb.dset.open(ifname) as dset:
+    with ds.open(ifname) as dset:
         for obj in dset:
             pass
     end = datetime.utcnow()
