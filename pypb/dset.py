@@ -175,12 +175,12 @@ def read_block(fobj, index, n, decompress):
 
     fobj.seek(block_start)
     block_chksum = fobj.read(CHECKSUM_LEN)
-    block_raw = fobj.read(block_size)
-    if checksum(block_raw) != block_chksum:
+    block_comp = fobj.read(block_size)
+    if checksum(block_comp) != block_chksum:
         raise IOError("Block %d checksum mismatch" % n)
 
-    block_raw = decompress(block_raw)
-    return msgpack_unpackb(block_raw)
+    block_raw = decompress(block_comp)
+    return block_raw
 
 class DatasetReader(Sequence, pypb.abs.Close):
     """
@@ -212,7 +212,8 @@ class DatasetReader(Sequence, pypb.abs.Close):
         self.cur_block = None
 
     def _load_block(self, i):
-        return read_block(self.fobj, self.index, i, self.decompress)
+        block_raw = read_block(self.fobj, self.index, i, self.decompress)
+        return msgpack_unpackb(block_raw)
 
     @pypb.abs.runonce
     def close(self):
@@ -474,9 +475,10 @@ class DatasetAppender(DatasetWriter):
             # The last block is not full
             if self.length % self.block_length != 0:
                 self.cur_block_idx = len(index) - 1
-                self.cur_block = read_block(self.fobj,
-                                            index, self.cur_block_idx,
-                                            decompress)
+                block_raw = read_block(self.fobj,
+                                       index, self.cur_block_idx,
+                                       decompress)
+                self.cur_block = msgpack_unpackb(block_raw)
 
                 # Remove last entry from index
                 index.pop()
