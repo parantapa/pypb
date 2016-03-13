@@ -10,9 +10,6 @@ import signal
 
 from functools import wraps
 
-from logbook import Logger
-log = Logger(__name__)
-
 # Standard exit signals not handled by Python directly
 STD_EXIT_SIGNALS = [
     signal.SIGINT,
@@ -32,10 +29,10 @@ def exit_signal(signum, _):
             signame = v
             break
 
-    msg = "{} : Received signal - {} ({})"
+    msg = "{} : Received signal - {} ({})\n"
     msg = msg.format(os.getpid(), signame, signum)
-    print(msg)
-    sys.stdout.flush()
+    sys.stderr.write(msg)
+    sys.stderr.flush()
 
     sys.exit(0)
 
