@@ -6,5 +6,4 @@ msgpack-python
 lz4
 backports.lzma
 numpy
-# pyzmq
 # py.test
