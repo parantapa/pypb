@@ -6,4 +6,5 @@ msgpack-python
 lz4
 backports.lzma
 numpy
+docopt
 # py.test
