@@ -49,9 +49,6 @@ from msgpack import packb as _msgpack_packb, \
                     unpackb as _msgpack_unpackb
 from lz4 import compress as lz4_compress, \
                 decompress as lz4_decompress
-from backports.lzma import compress as _xz_compress, \
-                           decompress as _xz_decompress, \
-                           FORMAT_RAW, CHECK_NONE, FILTER_LZMA2
 
 import pypb.abs
 
@@ -63,18 +60,6 @@ def msgpack_packb(x):
 
 def msgpack_unpackb(x):
     return _msgpack_unpackb(x, encoding="utf-8")
-
-XZ_FILTERS = [
-    {"id": FILTER_LZMA2, "preset": 6}
-]
-
-def xz_compress(x):
-    return _xz_compress(x, format=FORMAT_RAW,
-                        check=CHECK_NONE, preset=None, filters=XZ_FILTERS)
-
-def xz_decompress(x):
-    return _xz_decompress(x, format=FORMAT_RAW,
-                          memlimit=None, filters=XZ_FILTERS)
 
 MAGIC_STRING = "pb's dataset"
 HEADER_SPACE = 4096
@@ -94,13 +79,11 @@ UNSERIALIZER_TABLE = {
 COMPRESSER_TABLE = {
     "zlib": zlib_compress,
     "lz4": lz4_compress,
-    "xz": xz_compress,
 }
 
 DECOMPRESSER_TABLE = {
     "zlib": zlib_decompress,
     "lz4": lz4_decompress,
-    "xz": xz_decompress,
 }
 
 def checksum(data):
