@@ -11,6 +11,10 @@ from __future__ import division, print_function
 import sys
 from pprint import PrettyPrinter
 
+from pygments import highlight
+from pygments.lexers import PythonLexer
+from pygments.formatters import TerminalFormatter
+
 import pypb.dset as ds
 
 # Make pprint support unicode
@@ -18,14 +22,16 @@ import pypb.dset as ds
 class MyPrettyPrinter(PrettyPrinter):
     def format(self, obj, context, maxlevels, level):
         if isinstance(obj, unicode):
-            return (obj.encode('utf8'), True, False)
+            return ('"%s"' % obj.encode('utf8'), True, False)
         return PrettyPrinter.format(self, obj, context, maxlevels, level)
 
-_pprint = MyPrettyPrinter(indent=4, depth=5).pprint
+_pformat = MyPrettyPrinter(indent=4, depth=5).pformat
 
 def pprint(obj):
+    obj = _pformat(obj)
+    obj = highlight(obj, PythonLexer(), TerminalFormatter())
     try:
-        _pprint(obj)
+        print(obj)
     except IOError:
         sys.exit(0)
 

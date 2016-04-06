@@ -6,4 +6,5 @@ msgpack-python
 lz4
 numpy
 docopt
+pygments
 # py.test
