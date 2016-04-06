@@ -305,29 +305,35 @@ class DatasetWriter(pypb.abs.Close):
         self.fobj = None
         self.fobj = __builtin__.open(fname, "wb")
 
-        block_length = int(block_length)
-        if block_length < 1:
-            raise ValueError("Block length must be at-least 1")
-        self.block_length = block_length
-        self.length = 0
+        try:
+            block_length = int(block_length)
+            if block_length < 1:
+                raise ValueError("Block length must be at-least 1")
+            self.block_length = block_length
+            self.length = 0
 
-        if compression not in COMPRESSER_TABLE:
-            raise ValueError("Unknown compression '%s'" % compression)
-        self.compression = compression
-        self.compress = COMPRESSER_TABLE[compression]
+            if compression not in COMPRESSER_TABLE:
+                raise ValueError("Unknown compression '%s'" % compression)
+            self.compression = compression
+            self.compress = COMPRESSER_TABLE[compression]
 
-        if serializer not in SERIALIZER_TABLE:
-            raise ValueError("Unknown serializer '%s'" % serializer)
-        self.serializer = serializer
-        self.serialize = SERIALIZER_TABLE[serializer]
+            if serializer not in SERIALIZER_TABLE:
+                raise ValueError("Unknown serializer '%s'" % serializer)
+            self.serializer = serializer
+            self.serialize = SERIALIZER_TABLE[serializer]
 
-        self.cur_block = []
-        self.cur_block_idx = 0
+            self.cur_block = []
+            self.cur_block_idx = 0
 
-        self.index = []
+            self.index = []
 
-        # Write the header region with garbage
-        self.fobj.write(chr(42) * HEADER_SPACE)
+            # Write the header region with garbage
+            self.fobj.write(chr(42) * HEADER_SPACE)
+
+        except Exception:
+            self.fobj.close()
+            self.fobj = None
+            raise
 
     @pypb.abs.runonce
     def close(self):
@@ -435,52 +441,58 @@ class DatasetAppender(DatasetWriter):
         self.fobj = None
         self.fobj = __builtin__.open(fname, "r+b")
 
-        _, header, decompress, _ = read_header(self.fobj)
+        try:
+            _, header, decompress, _ = read_header(self.fobj)
 
-        index_start = header["index_start"]
-        index_size = header["index_size"]
-        index = read_index(self.fobj, index_start, index_size, decompress)
+            index_start = header["index_start"]
+            index_size = header["index_size"]
+            index = read_index(self.fobj, index_start, index_size, decompress)
 
-        self.block_length = header["block_length"]
-        self.length = header["length"]
+            self.block_length = header["block_length"]
+            self.length = header["length"]
 
-        if header["compression"] not in COMPRESSER_TABLE:
-            raise ValueError("Unknown compression '%s'" % header["compression"])
-        self.compression = header["compression"]
-        self.compress = COMPRESSER_TABLE[header["compression"]]
+            if header["compression"] not in COMPRESSER_TABLE:
+                raise ValueError("Unknown compression '%s'" % header["compression"])
+            self.compression = header["compression"]
+            self.compress = COMPRESSER_TABLE[header["compression"]]
 
-        if header["serializer"] not in SERIALIZER_TABLE:
-            raise ValueError("Unknown serializer '%s'" % header["serializer"])
-        self.serializer = header["serializer"]
-        self.serialize = SERIALIZER_TABLE[header["serializer"]]
+            if header["serializer"] not in SERIALIZER_TABLE:
+                raise ValueError("Unknown serializer '%s'" % header["serializer"])
+            self.serializer = header["serializer"]
+            self.serialize = SERIALIZER_TABLE[header["serializer"]]
 
-        if len(index) > 0:
-            # The last block is not full
-            if self.length % self.block_length != 0:
-                self.cur_block_idx = len(index) - 1
-                block_raw = read_block(self.fobj,
-                                       index, self.cur_block_idx,
-                                       decompress)
-                self.cur_block = msgpack_unpackb(block_raw)
+            if len(index) > 0:
+                # The last block is not full
+                if self.length % self.block_length != 0:
+                    self.cur_block_idx = len(index) - 1
+                    block_raw = read_block(self.fobj,
+                                           index, self.cur_block_idx,
+                                           decompress)
+                    self.cur_block = msgpack_unpackb(block_raw)
 
-                # Remove last entry from index
-                index.pop()
+                    # Remove last entry from index
+                    index.pop()
 
-                self.index = index
+                    self.index = index
 
+                else:
+                    self.cur_block_idx = len(index)
+                    self.cur_block = []
+                    self.index = index
             else:
-                self.cur_block_idx = len(index)
+                self.cur_block_idx = 0
                 self.cur_block = []
-                self.index = index
-        else:
-            self.cur_block_idx = 0
-            self.cur_block = []
-            self.index = []
+                self.index = []
 
-        # Move the file pointer to after the current index data.
-        # This will create holes in the file.
-        # But it reduces the chances of total loss in case of crash.
-        self.fobj.seek(index_start + CHECKSUM_LEN + index_size)
+            # Move the file pointer to after the current index data.
+            # This will create holes in the file.
+            # But it reduces the chances of total loss in case of crash.
+            self.fobj.seek(index_start + CHECKSUM_LEN + index_size)
+
+        except Exception:
+            self.fobj.close()
+            self.fobj = None
+            raise
 
 def open(fname, mode="r", block_length=None,       # pylint: disable=redefined-builtin
          compression="lz4", serializer="msgpack"):
