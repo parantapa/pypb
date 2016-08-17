@@ -3,8 +3,3 @@ python-daemon
 gevent
 setproctitle
 msgpack-python
-lz4
-numpy
-docopt
-pygments
-# py.test
