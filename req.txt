@@ -1,5 +1,0 @@
-logbook
-python-daemon
-gevent
-setproctitle
-msgpack-python

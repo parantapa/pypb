@@ -1,2 +1,3 @@
 .cache
 *.prof
+PyPB.egg-info/
