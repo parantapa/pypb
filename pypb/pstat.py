@@ -5,13 +5,14 @@ All results returned are in bytes.
 Recipe copied from http://code.activestate.com/recipes/286222-memory-usage/
 """
 
+from __future__ import print_function
+
 __all__    = ["vm", "rss", "max_vm", "max_rss",
               "io_read", "io_write",
               "disk_io_read", "disk_io_write",
               "vol_ctxt_switches", "nonvol_ctxt_switches",
               "print_stats"]
 
-import sys
 from os import getpid
 from datetime import datetime
 
@@ -29,7 +30,7 @@ def get_vm_data(VmKey):
     """
 
     fname = "/proc/{0}/status".format(getpid())
-    
+
     try:
         fobj = open(fname)
     except IOError:
@@ -155,15 +156,15 @@ def disk_io_write():
     key   = "write_bytes"
     return read_proc_counter(fname, key)
 
-def print_stats():
+def print_stats(printfn=print):
     """
     Print runtime and memory usage.
     """
 
     now = datetime.utcnow()
 
-    rt          = now - START
-    max_vm_m     = max_vm() / MEGA
+    rt            = now - START
+    max_vm_m      = max_vm() / MEGA
     max_rss_m     = max_rss() / MEGA
     io_read_m     = io_read() / MEGA
     io_write_m    = io_write() / MEGA
@@ -172,15 +173,12 @@ def print_stats():
     vol_switch  = vol_ctxt_switches()
     nvol_switch = nonvol_ctxt_switches()
 
-    print "\n"
-    print "Total running time             : {}".format(rt)
-    print "Peak virtual memory size       : {:.2f} MiB".format(max_vm_m)
-    print "Peak resident set size         : {:.2f} MiB".format(max_rss_m)
-    print "Total IO Read                  : {:.2f} MiB".format(io_read_m)
-    print "Total IO Write                 : {:.2f} MiB".format(io_write_m)
-    print "Disk IO Read                   : {:.2f} MiB".format(dio_read_m)
-    print "Disk IO Write                  : {:.2f} MiB".format(dio_write_m)
-    print "# Voluntary context switch     : {:,d}".format(vol_switch)
-    print "# Non-Voluntary context switch : {:,d}".format(nvol_switch)
-
-    sys.stdout.flush()
+    printfn("Total running time             : {}".format(rt))
+    printfn("Peak virtual memory size       : {:.2f} MiB".format(max_vm_m))
+    printfn("Peak resident set size         : {:.2f} MiB".format(max_rss_m))
+    printfn("Total IO Read                  : {:.2f} MiB".format(io_read_m))
+    printfn("Total IO Write                 : {:.2f} MiB".format(io_write_m))
+    printfn("Disk IO Read                   : {:.2f} MiB".format(dio_read_m))
+    printfn("Disk IO Write                  : {:.2f} MiB".format(dio_write_m))
+    printfn("# Voluntary context switch     : {:,d}".format(vol_switch))
+    printfn("# Non-Voluntary context switch : {:,d}".format(nvol_switch))
